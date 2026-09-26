@@ -4,8 +4,8 @@
 
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
-      <h1 className="font-display text-5xl tracking-widest text-foreground">
+    <main className="flex min-w-0 w-full flex-1 flex-col items-center justify-center gap-8 p-6 sm:p-8">
+      <h1 className="max-w-full text-center font-display text-3xl tracking-[0.12em] text-foreground sm:text-5xl sm:tracking-widest">
         <span className="mr-1 inline-block bg-sun px-2 pixel-border-sm">S</span>
         ideQuest
       </h1>
