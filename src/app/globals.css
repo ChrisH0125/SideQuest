@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* SideQuest pixel theme
+   Palette + typography from the design reference. Components should read from
+   these tokens (bg-sun, text-foreground, pixel-border, etc.) rather than
+   hard-coding hex values, so we can retheme later in one place. */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  /* Source palette — constant across themes */
+  --ink: #2d1b3d;
+  --paper: #fff6dc;
+  --sun: #ffd166;
+  --mint: #86dcb4;
+  --lilac: #c3b1ff;
+  --sky: #8fd3ff;
+  --tomato: #ff6f59;
+  --pinky: #ff9ec4;
+
+  /* Room environment */
+  --wall-1: #f6d9a4;
+  --wall-2: #e8c184;
+  --floor-1: #c19067;
+  --floor-2: #a26f47;
+  --muted: #6a577c;
+
+  /* Theme-aware slots — flipped in dark mode below */
+  --background: var(--wall-1);
+  --foreground: var(--ink);
+  --surface: var(--paper);
+  --shadow-ink: var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --background: #291836;
+    --foreground: #f5e5c4;
+    --surface: #1e1230;
+    --shadow-ink: #0b0417;
+    --muted: #a794b8;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --background: #291836;
+  --foreground: #f5e5c4;
+  --surface: #1e1230;
+  --shadow-ink: #0b0417;
+  --muted: #a794b8;
+  color-scheme: dark;
+}
+
+/* Expose the tokens to Tailwind so utility classes are generated. */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-sun: var(--sun);
+  --color-mint: var(--mint);
+  --color-lilac: var(--lilac);
+  --color-sky: var(--sky);
+  --color-tomato: var(--tomato);
+  --color-pinky: var(--pinky);
+  --color-wall-1: var(--wall-1);
+  --color-wall-2: var(--wall-2);
+  --color-floor-1: var(--floor-1);
+  --color-floor-2: var(--floor-2);
+  --color-muted: var(--muted);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+
+  --font-display: var(--font-pixelify), system-ui, sans-serif;
+  --font-body: var(--font-atkinson), system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+}
+
+/* 4px stepped pixel border — the recurring frame style across the retro UI. */
+@utility pixel-border {
+  border: 4px solid var(--foreground);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+}
+
+@utility pixel-border-sm {
+  border: 3px solid var(--foreground);
+  box-shadow: 3px 3px 0 var(--shadow-ink);
+}
+
+@utility pixelated {
+  image-rendering: pixelated;
 }
