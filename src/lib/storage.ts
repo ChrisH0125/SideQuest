@@ -62,11 +62,14 @@ export function loadWorkspace(storage = browserStorage()): LoadResult {
   return { status: "loaded", workspace: workspaceStateSchema.parse(file.workspace), savedAt: file.savedAt };
 }
 
-export function clearWorkspace(storage = browserStorage()): void {
+export function clearWorkspace(storage = browserStorage()): SaveResult {
+  if (!storage) return { ok: false, reason: "This browser is not allowing saves." };
   try {
-    storage?.removeItem(STORAGE_KEY);
+    storage.removeItem(STORAGE_KEY);
+    storage.removeItem(BROKEN_SAVE_KEY);
+    return { ok: true };
   } catch {
-    // Nothing to clear if storage is blocked.
+    return { ok: false, reason: "Could not clear the saved project from this browser." };
   }
 }
 
