@@ -1,7 +1,7 @@
 // Checks a Pip turn request, asks Pip, and checks the reply before it reaches the browser.
 // Kept separate from the route file so the logic can be tested without a server.
 import type { ApiError, PipTurnResponse } from "./contracts";
-import { getPipReply } from "./ai/pip";
+import { getPipReply, InvalidPipModelOutputError } from "./ai/pip";
 import { pipTurnRequestSchema, pipTurnResponseForRequestSchema } from "./schemas";
 
 export type PipTurnResult =
@@ -23,7 +23,14 @@ export async function handlePipTurn(body: unknown): Promise<PipTurnResult> {
   let reply: unknown;
   try {
     reply = await getPipReply(request.data);
-  } catch {
+  } catch (error) {
+    if (error instanceof InvalidPipModelOutputError) {
+      return apiError(
+        502,
+        "invalid_ai_output",
+        "Pip's answer was not usable, so nothing was changed. Try again.",
+      );
+    }
     return apiError(502, "ai_unavailable", "Pip could not answer right now. Your work is safe. Try again.");
   }
 
