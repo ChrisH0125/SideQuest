@@ -269,7 +269,13 @@ export function pipTurnResponseForRequestSchema(
 
 export const apiErrorSchema = z.object({
   error: z.object({
-    code: z.enum(["invalid_request", "stale_revision", "ai_unavailable", "invalid_ai_output"]),
+    code: z.enum([
+      "invalid_request",
+      "stale_revision",
+      "rate_limited",
+      "ai_unavailable",
+      "invalid_ai_output",
+    ]),
     message: z.string(),
   }),
 });
