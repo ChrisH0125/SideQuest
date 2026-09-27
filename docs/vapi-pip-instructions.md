@@ -79,3 +79,9 @@ Try “Graph y equals x squared minus four from minus five to five.” Then ask
 Use **Math → Equation / working step** to enter your own equations, or ask Pip to
 show one working step. Math supports the notation listed in the prompt, not
 arbitrary LaTeX, implicit curves, handwriting, or a symbolic algebra checker.
+
+## Assistant ID and startup errors
+
+Set `NEXT_PUBLIC_VAPI_ASSISTANT_ID` to the UUID shown beside Pip, not the dashboard URL. The client also accepts an HTTPS Vapi assistant dashboard link and extracts its UUID before starting a call. Invalid IDs are rejected before microphone access. Public environment changes require a new deployment.
+
+Optional SDK audio-processing and volume-observer setup warnings do not end a call. Fatal errors still stop the session and show a category-specific message and a call ID when available. Raw provider errors and credentials are never rendered. Run `npm run test:voice` for configuration and startup regression checks.

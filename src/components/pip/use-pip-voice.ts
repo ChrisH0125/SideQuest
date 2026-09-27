@@ -7,6 +7,8 @@ import type { WorkspaceState } from "@/lib/contracts";
 import type { WorkspaceCommand } from "@/lib/workspace-reducer";
 import type { CommandReceipt } from "@/components/board/workspace-provider";
 import { parseVoiceActions, pipVoiceTools, voiceWorkspaceContext } from "@/lib/pip-voice-tools";
+import { isOptionalVoiceError, voiceError } from "@/lib/pip-voice-errors";
+import { parseVapiAssistantId } from "@/lib/pip-voice-config";
 
 const transcriptSchema = z.object({
   type: z.literal("transcript"),
@@ -15,14 +17,6 @@ const transcriptSchema = z.object({
   transcript: z.string().min(1).max(10000),
 });
 type VoiceState = "idle" | "starting" | "listening" | "speaking" | "stopping";
-
-function voiceError(error: unknown): string {
-  const name = error instanceof DOMException ? error.name : "";
-  if (name === "NotAllowedError") return "Allow microphone access in your browser and macOS settings, then try again.";
-  if (name === "NotFoundError") return "No microphone was found. Connect one and try again.";
-  if (name === "NotReadableError") return "The microphone is busy. Close other recording apps, then try again.";
-  return "The voice connection ended before it was ready. Check your mic and Vapi call log; try a hotspot to compare networks. You can keep typing here.";
-}
 
 export function usePipVoice(workspace: WorkspaceState, runCommand: (command: WorkspaceCommand) => CommandReceipt, getWorkspace: () => WorkspaceState) {
   const [state, setState] = useState<VoiceState>("idle");
@@ -74,6 +68,11 @@ export function usePipVoice(workspace: WorkspaceState, runCommand: (command: Wor
 
   async function start() {
     if (busy.current || !available) return;
+    const assistantId = parseVapiAssistantId(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
+    if (!assistantId) {
+      setError("Pip's voice setup needs attention: the assistant ID is invalid. You can keep typing here.");
+      return;
+    }
     busy.current = true;
     const attempt = ++generation.current;
     const sessionId = crypto.randomUUID();
@@ -87,27 +86,41 @@ export function usePipVoice(workspace: WorkspaceState, runCommand: (command: Wor
       if (!isCurrent()) return;
       const { default: VapiClient } = await import("@vapi-ai/web");
       if (!isCurrent()) return;
-      const instance = new VapiClient(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+      const instance = new VapiClient(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!.trim());
       client.current = instance;
+      let callId: string | undefined;
+      let endedReason: string | undefined;
       const fail = (issue: unknown) => {
         if (!isCurrent()) return;
         clearWatchdog();
         active.current = false;
-        setError(voiceError(issue)); setState("idle");
+        setError(voiceError(issue, callId)); setState("idle");
         generation.current += 1;
-        void dispose(instance).finally(() => { if (mounted.current) busy.current = false; });
+        const failedGeneration = generation.current;
+        void dispose(instance).finally(() => {
+          if (mounted.current && generation.current === failedGeneration) {
+            if (client.current === instance) client.current = null;
+            busy.current = false;
+          }
+        });
       };
+      instance.on("call-start-progress", progress => {
+        if (!isCurrent()) return;
+        if (typeof progress.metadata?.callId === "string") callId = progress.metadata.callId;
+      });
       instance.on("call-start", () => {
         if (!isCurrent()) { void dispose(instance); return; }
         clearWatchdog();
         active.current = true;
         setState("listening");
-        instance.send({ type: "add-message", message: { role: "system", content: voiceWorkspaceContext(latest.current.getWorkspace()) }, triggerResponseEnabled: false });
+        try {
+          instance.send({ type: "add-message", message: { role: "system", content: voiceWorkspaceContext(latest.current.getWorkspace()) }, triggerResponseEnabled: false });
+        } catch { setActionError("Pip could not receive your workspace. Reconnect before asking for a board change."); }
       });
       instance.on("call-end", () => {
         if (!isCurrent()) return;
         clearWatchdog();
-        if (!active.current) setError(voiceError(null));
+        if (!active.current || (endedReason && /error|failed|not.receive|exceeded/.test(endedReason))) setError(voiceError(endedReason, callId));
         generation.current += 1;
         active.current = false; busy.current = false; setState("idle");
       });
@@ -116,6 +129,12 @@ export function usePipVoice(workspace: WorkspaceState, runCommand: (command: Wor
       instance.on("local-volume-level", level => { if (isCurrent() && level > 0.02) setMicHeard(true); });
       instance.on("message", (message: unknown) => {
         if (!isCurrent()) return;
+        if (message && typeof message === "object" && "type" in message && message.type === "status-update" && "status" in message && message.status === "ended" && "endedReason" in message) {
+          if (typeof message.endedReason === "string" && /error|failed|not.receive|exceeded/.test(message.endedReason)) {
+            endedReason = message.endedReason;
+            setError(voiceError(endedReason, callId));
+          }
+        }
         const tools = parseVoiceActions(message, sessionId, () => crypto.randomUUID());
         if (tools.kind !== "ignored") {
           if (!active.current) return;
@@ -142,10 +161,10 @@ export function usePipVoice(workspace: WorkspaceState, runCommand: (command: Wor
           setTranscript(previous => ((previous ? previous + " " : "") + turn.transcript).slice(-2000));
         }
       });
-      instance.on("error", fail);
+      instance.on("error", issue => { if (!isOptionalVoiceError(issue)) fail(issue); });
       instance.on("call-start-failed", fail);
-      watchdog.current = setTimeout(() => fail(null), 30_000);
-      const call = await instance.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!, {
+      watchdog.current = setTimeout(() => fail(new Error("connection-timeout")), 30_000);
+      const call = await instance.start(assistantId, {
         firstMessage: "Hi, I’m Pip. What part of your task would you like to untangle?",
         "tools:append": pipVoiceTools,
       });

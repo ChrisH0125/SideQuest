@@ -96,3 +96,7 @@ References: [Git import](https://vercel.com/docs/git),
 These values were copied from this project's Vercel Domains page and saved in
 GoDaddy. Nameservers and unrelated records were preserved. HTTPS was verified
 after the records propagated.
+
+### Voice configuration correction, 2026-09-27
+
+Production sent a dashboard URL as `assistantId`, causing HTTP 400 (`assistantId must be a UUID`). Replaced only `NEXT_PUBLIC_VAPI_ASSISTANT_ID` with its UUID as a Config value for Production and Preview. The original write-only Secret could not be edited with its public prefix; Chris explicitly approved replacing that setting. The voice client also extracts UUIDs from Vapi dashboard links and rejects malformed settings before microphone access. Rebuild after changing any `NEXT_PUBLIC_` value.

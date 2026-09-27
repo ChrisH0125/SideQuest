@@ -80,6 +80,7 @@ locally from bounded expressions.
 | `npm run test:api` | API regression tests |
 | `npm run test:pip-actions` | AI actions, Undo, and duplicate protection |
 | `npm run test:math` | Math parsing, plotting, and persistence |
+| `npm run test:voice` | Voice configuration and startup failures |
 | `node scripts/check-workspace.cjs` | Workspace and reward regressions |
 | `npm run smoke:api` | Test a running app with real Gemini replies |
 | `npm run lint` | Run ESLint |

@@ -61,3 +61,7 @@ Earlier MVP checks:
 - Saves are browser-local. Old notebook data is migrated without deleting its
   original key. Unreadable saves pause new writes; export your draft for recovery.
 
+
+## Voice startup correction (2026-09-27)
+
+A production browser request returned HTTP 400: `assistantId must be a UUID`. The deployed value was a full Vapi dashboard URL. A direct request using the local UUID returned HTTP 201, isolating this failure to deployment configuration rather than microphone transport. The client now normalizes Vapi assistant links, validates before requesting the microphone, distinguishes fatal SDK errors from optional audio enhancements, and preserves safe call references. Six voice regression checks and ten action checks passed; the production build and type checking passed. Live post-deployment voice verification remains pending.

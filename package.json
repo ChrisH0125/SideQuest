@@ -11,7 +11,8 @@
     "smoke:api": "node scripts/smoke-pip-api.mjs",
     "test:api": "node --test scripts/pip-api.test.cjs",
     "test:pip-actions": "node --test scripts/pip-actions.test.cjs",
-    "test:math": "node --test scripts/math.test.cjs"
+    "test:math": "node --test scripts/math.test.cjs",
+    "test:voice": "node --test scripts/pip-voice.test.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
