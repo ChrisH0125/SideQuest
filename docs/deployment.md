@@ -2,8 +2,13 @@
 
 Hosting: Vercel, deploying the repository root from `main`.
 Domain: `sidequestspace.com`, registered at GoDaddy.
-This document describes setup; verify the Vercel deployment and DNS before calling
-the domain live.
+Live site: https://www.sidequestspace.com (the apex redirects to www).
+Verified 2026-09-27: HTTPS returns 200, both GoDaddy DNS records match Vercel,
+and the production API smoke test passes with real Gemini replies. All five
+active variables are present for Production and Preview. Vapi currently allows
+all origins and assistants; the production origins are therefore permitted,
+but the public key is not restricted to this app. A live production microphone
+call has not been tested by the agent.
 
 ## Environment variables
 
@@ -63,7 +68,7 @@ as a backstop.
 5. Deploy. Confirm the generated HTTPS address loads and Pip gives a real reply.
    If variables change afterward, redeploy; public Vapi variables are build-time.
 6. Project Settings → Domains: add `sidequestspace.com` and
-   `www.sidequestspace.com`; redirect www to the apex domain.
+   `www.sidequestspace.com`; keep the apex redirecting to www, matching the current production setup.
 7. In GoDaddy → domain → DNS, apply the exact A record for `@` and CNAME record
    for `www` shown by this project's Vercel Domains page. Leave nameservers and
    unrelated email/verification records alone. Wait for Valid Configuration.
@@ -80,3 +85,14 @@ domain have separate workspaces. Local demo data does not automatically transfer
 References: [Git import](https://vercel.com/docs/git),
 [environment variables](https://vercel.com/docs/environment-variables), and
 [custom domains](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
+
+## Current DNS
+
+| Type | Name | Value |
+| --- | --- | --- |
+| A | @ | 216.198.79.1 |
+| CNAME | www | 9cc10299c97ee3e1.vercel-dns-017.com. |
+
+These values were copied from this project's Vercel Domains page and saved in
+GoDaddy. Nameservers and unrelated records were preserved. HTTPS was verified
+after the records propagated.
