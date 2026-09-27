@@ -8,7 +8,7 @@ export function notebookExport(workspace: WorkspaceState): ExportFile {
   return {
     filename: `${fileSafeName(workspace.title)}.txt`,
     mimeType: "text/plain",
-    text: `${workspace.title}\n\n${workspace.notebookText}\n`,
+    text: `${workspace.title}\n\n${workspace.notebookText}\n` + ((workspace.mathItems?.length ?? 0) > 0 ? "\nMath on the canvas\n" + workspace.mathItems!.map(item => `${item.kind === "graph" ? "Graph" : "Equation"}: ${item.expression}${item.kind === "graph" ? ` (x from ${item.xMin} to ${item.xMax})` : ""}`).join("\n") + "\n" : ""),
   };
 }
 

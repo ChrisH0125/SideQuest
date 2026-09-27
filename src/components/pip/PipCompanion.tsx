@@ -2,21 +2,24 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useWorkspace } from "@/components/board/workspace-provider";
-import { nextCardPosition } from "@/components/board/idea-board";
+import { nextIdeaPosition } from "@/lib/math-items";
 import { apiErrorSchema, pipTurnRequestSchema, pipTurnResponseForRequestSchema } from "@/lib/schemas";
 import { Pip } from "./Pip";
 import { usePipVoice } from "./use-pip-voice";
 import styles from "@/components/board/workspace.module.css";
 import type { PipOrigin } from "@/components/room/RoomHub";
 
-export function PipCompanion({ canvasMode, expanded, onExpandedChange, origin }: {
+export function PipCompanion({ canvasMode, expanded, onExpandedChange, origin, preferredMode }: {
   canvasMode: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   origin: PipOrigin;
+  preferredMode: "voice" | "text";
 }) {
-  const { workspace, runCommand } = useWorkspace();
-  const voice = usePipVoice(workspace);
+  const { workspace, runCommand, getWorkspace, pipActionStatus, canUndo, undo } = useWorkspace();
+  const voice = usePipVoice(workspace, runCommand, getWorkspace);
+  const [mode, setMode] = useState(preferredMode);
+  useEffect(() => setMode(preferredMode), [preferredMode, expanded]);
   const [text, setText] = useState("");
   const [status, setStatus] = useState("");
   const [sending, setSending] = useState(false);
@@ -60,9 +63,9 @@ export function PipCompanion({ canvasMode, expanded, onExpandedChange, origin }:
       const checked = pipTurnResponseForRequestSchema(request.data).safeParse(body);
       if (!checked.success) throw new Error("Pip’s response didn’t match your request. Nothing changed.");
       if (!mounted.current) return;
-      const result = runCommand({ type: "apply-pip-turn", userText: request.data.userText, response: checked.data });
+      const result = runCommand({ type: "apply-pip-turn", userText: request.data.userText, response: checked.data, resourceIds: checked.data.actions?.map(() => crypto.randomUUID()) });
       if (!result.ok) throw new Error(result.reason + " Your message is here; send it again with the updated board.");
-      setText(""); setStatus("Reply ready. You choose which ideas to add.");
+      setText(""); setStatus(checked.data.actions?.length ? "Board updated. You can edit the cards or undo the change." : "Reply ready.");
     } catch (error) {
       if (mounted.current) setStatus(abort.signal.aborted ? "The request timed out. Your message is still here; try again." : error instanceof Error ? error.message : "Pip couldn’t answer. Try again.");
     } finally {
@@ -85,15 +88,21 @@ export function PipCompanion({ canvasMode, expanded, onExpandedChange, origin }:
       <button type="button" aria-label="Minimize Pip" onClick={() => { onExpandedChange(false); requestAnimationFrame(() => canvasMode ? sprite.current?.focus() : document.querySelector<HTMLButtonElement>(".pip-hit")?.focus()); }}>−</button>
     </div>
     <div className={styles.bubble}>{lastReply ?? "You don’t need the whole answer yet. What’s one thought you want to start with?"}</div>
+    <div className={styles.actions} aria-label="Talk or type"><button type="button" aria-pressed={mode === "voice"} onClick={() => setMode("voice")}>Speak</button><button type="button" aria-pressed={mode === "text"} onClick={() => setMode("text")}>Type</button></div>
+    <div hidden={mode !== "voice"}>
     <div className={styles.voiceControls}>
-      {voice.state === "idle" ? <button type="button" className={styles.primary} disabled={!voice.available} onClick={() => void voice.start()}>Talk to Pip</button> :
+      {voice.state === "idle" ? <button id="pip-voice-start" type="button" className={styles.primary} disabled={!voice.available} onClick={() => void voice.start()}>Talk to Pip</button> :
         <button type="button" className={styles.primary} disabled={voice.state === "stopping"} onClick={() => void voice.stop()}>{voice.state === "stopping" ? "Stopping…" : "End call"}</button>}
       {live && <button type="button" aria-pressed={voice.muted} onClick={voice.toggleMuted}>{voice.muted ? "Unmute" : "Mute"}</button>}
     </div>
     <p className={styles.hint}>{voice.available ? live ? voice.micHeard ? "Microphone audio detected on this device." : "Speak a few words to check your microphone." : "Voice uses your microphone. You can keep working during a call." : "Voice isn’t configured here yet. You can type below."}</p>
     {voice.caption && <p className={styles.caption} aria-live="polite">{voice.caption}</p>}
     {voice.error && <p role="alert" className={styles.message}>{voice.error}</p>}
-    <form className={styles.composer} onSubmit={submit}>
+    {voice.transcript && <button type="button" onClick={() => { setText(voice.transcript); voice.clearTranscript(); setMode("text"); }}>Review captured words</button>}
+    <p className={styles.hint}>Say “capture this idea” or ask Pip to change a card. Successful changes appear below. Review captured words only if you need a typed retry.</p>
+    {voice.actionError && <p className={styles.message} role="alert">{voice.actionError}</p>}
+    </div>
+    <form hidden={mode !== "text"} className={styles.composer} onSubmit={submit}>
       <label htmlFor="pip-message">Or write a thought</label>
       <textarea id="pip-message" value={text} onChange={event => setText(event.target.value)} maxLength={2000} rows={3} disabled={sending} placeholder="I’m thinking about…" />
       <div className={styles.actions}>
@@ -102,12 +111,16 @@ export function PipCompanion({ canvasMode, expanded, onExpandedChange, origin }:
       </div>
       <p className={styles.message} role="status">{status}</p>
     </form>
+    {pipActionStatus && <section className={styles.suggestion} aria-label="Pip board activity">
+      <p role="status">{pipActionStatus}</p>
+      <button type="button" disabled={!canUndo} onClick={undo}>Undo last board change</button>
+    </section>}
     {suggestion && <section className={styles.suggestion} aria-label="Suggested idea">
       <h3>A possible next card</h3>
       <p>{suggestion.text}</p>
       <div className={styles.actions}>
         <button type="button" onClick={() => {
-          const result = runCommand({ type: "accept-card", suggestionId: suggestion.suggestionId, cardId: suggestion.suggestionId, position: nextCardPosition(workspace.cards.length) });
+          const result = runCommand({ type: "accept-card", suggestionId: suggestion.suggestionId, cardId: suggestion.suggestionId, position: nextIdeaPosition(workspace) });
           setStatus(result.ok ? "Added to your board." : result.reason);
         }}>Add to board</button>
         <button type="button" onClick={() => runCommand({ type: "dismiss-card", suggestionId: suggestion.suggestionId })}>Skip</button>

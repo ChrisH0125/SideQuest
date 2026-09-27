@@ -66,3 +66,12 @@ export const demoPipResponse: PipTurnResponse = {
   suggestedNextStep: null,
   proposedActions: [{ type: "highlight", cardIds: ["card-grandma", "card-gardens"] }],
 };
+
+// The app starts empty; demo fixtures above remain available to contract tests.
+export const emptyWorkspace: WorkspaceState = {
+  projectId: "my-workspace", title: "My workspace", assignment: "",
+  requirements: [], cards: [], connections: [], outlineOrder: [], selectedCardIds: [],
+  currentStepId: null, notebookText: "", conversation: [], revision: 0,
+  coins: 0, rewardEventIds: [], ownedDecorations: [],
+  pending: { requirements: [], cards: [], nextStep: null },
+};

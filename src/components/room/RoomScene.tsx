@@ -5,6 +5,8 @@ import type { WorkspaceState } from "@/lib/contracts";
 import { Pip } from "@/components/pip/Pip";
 import type { ModalTarget } from "@/components/modals/ModalHost";
 import "./room-styles.css";
+import { DecorationArt } from "./DecorationArt";
+import { DECORATIONS, type DecorationId } from "@/lib/rewards";
 import { ThemeToggle } from "./ThemeToggle";
 
 type OpenFn = (target: Exclude<ModalTarget, null>, opener: HTMLElement) => void;
@@ -27,10 +29,14 @@ export function RoomScene({
   onToggleTheme,
 }: RoomSceneProps) {
   const frame = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scene, setScene] = useState({ scale: 1, width: 960, height: 720 });
   useEffect(() => {
     if (!frame.current) return;
-    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 960));
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const scale = Math.min(width / (width < 760 ? 620 : 960), height / 720);
+      if (scale > 0) setScene({ scale, width: width / scale, height: height / scale });
+    });
     observer.observe(frame.current);
     return () => observer.disconnect();
   }, []);
@@ -46,12 +52,12 @@ export function RoomScene({
   const questText =
     workspace.pending.nextStep?.text ??
     workspace.pending.cards[0]?.text ??
-    "KEEP GOING";
+    "ONE SMALL STEP";
 
   return (
     <main id="room-scene" className="app-stage">
       <div className="hero-frame" ref={frame}>
-      <div className="game-shell" style={{ transform: `scale(${scale})` }}>
+      <div className="game-shell" style={{ transform: `scale(${scene.scale})`, width: scene.width, height: scene.height }}>
         <div className="top-strip">
           <div
             className="coin-chip"
@@ -82,7 +88,7 @@ export function RoomScene({
           aria-label={`${doneReqs} of ${totalReqs} requirements done, ${notebookWordCount} words drafted, quest ${questText}`}
         >
           <div className="status-block">
-            <span>REQUIREMENTS</span>
+            <span>CHECKLIST</span>
             <div className="progress" aria-hidden>
               <i style={{ width: `${reqPct}%` }} />
             </div>
@@ -92,7 +98,7 @@ export function RoomScene({
           </div>
           <div className="status-divider" />
           <div className="status-block draft-status">
-            <span>DRAFT</span>
+            <span>WORK</span>
             <b>{notebookWordCount} WORDS</b>
           </div>
           <div className="status-divider" />
@@ -140,10 +146,12 @@ export function RoomScene({
             />
             <Recorder onOpen={openFrom("mic")} />
 
-            <div className="rug" aria-hidden><i /></div>
+            {workspace.ownedDecorations.includes("rug") && <div className="rug" aria-label="Rug in your room" role="img"><i /></div>}
+            {workspace.ownedDecorations.includes("rainbow-rug") && <div className="room-item room-item-rainbow-rug" role="img" aria-label="Rainbow rug in your room"><DecorationArt item="rainbow-rug" /></div>}
+            {(["plant", "lamp", "poster", "fish-bowl"] as DecorationId[]).filter(item => workspace.ownedDecorations.includes(item)).map(item => <div key={item} className={`room-item room-item-${item}`} role="img" aria-label={`${DECORATIONS[item].name} in your room`}><DecorationArt item={item} /></div>)}
 
             <div className="speech-bubble" role="status">
-              <b>PIP · ONE QUESTION</b>
+              <b>PIP · ONE SMALL STEP</b>
               <p>{pipLine}</p>
             </div>
 
@@ -162,7 +170,8 @@ export function RoomScene({
       </div>
       <nav className="room-mobile-actions" aria-label="Room shortcuts">
         <button type="button" className="pixel-button tone-mint" onClick={openFrom("board")}>CANVAS</button>
-        <button type="button" className="pixel-button tone-cream" onClick={openFrom("notebook")}>NOTEBOOK</button>
+        <button type="button" className="pixel-button tone-cream" onClick={openFrom("notebook")}>WORK</button>
+        <button type="button" className="pixel-button tone-pink" onClick={openFrom("shop")}>SHOP</button>
         <ThemeToggle night={night} onToggle={onToggleTheme} />
       </nav>
     </main>
@@ -285,7 +294,7 @@ function Notebook({
       type="button"
       className="object-hit notebook-hit"
       onClick={onOpen}
-      aria-label="Open the notebook"
+      aria-label="Open your work area"
     >
       <div className="notebook">
         <div className="notebook-tape" />
@@ -295,12 +304,12 @@ function Notebook({
         <div className="notebook-margin" />
         <div className="notebook-lines" />
         <div className="notebook-copy">
-          <b>{hasText ? "DRAFT IN PROGRESS" : "START YOUR DRAFT"}</b>
+          <b>{hasText ? "WORK IN PROGRESS" : "DO YOUR WORK"}</b>
         </div>
         <div className="word-sticker">{wordCount} WORDS</div>
         <div className="pixel-pencil"><i /></div>
       </div>
-      <HoverLabel>NOTEBOOK</HoverLabel>
+      <HoverLabel>YOUR WORK</HoverLabel>
     </button>
   );
 }

@@ -441,3 +441,5 @@
   }
   .shopGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.shopArt { display: grid; place-items: center; min-height: 100px; background: #b8e7ff; border: 2px solid #3b2451; margin-bottom: 12px; }

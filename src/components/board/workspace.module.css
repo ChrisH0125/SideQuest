@@ -83,3 +83,47 @@
  .pipPanel { max-height: calc(100dvh - 190px); width: min(350px, calc(100vw - 24px)); }
 }
 @media (max-width: 400px) { .canvasHeader h1 { font-size: 18px; } .canvasHeader :global(.pixel-button) { padding: 7px; font-size: 12px; } }
+
+.workspaceLayout { display: grid; grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 64px); }
+.workspaceLayout[data-work-open="true"] { grid-template-columns: minmax(0, 1fr) minmax(320px, 36%); }
+.workspaceLayout .board { height: 100%; min-width: 0; }
+.workArea { display: flex; flex-direction: column; gap: 14px; min-width: 0; overflow: auto; padding: 22px 24px 130px; border-left: 3px solid var(--ink); background: var(--canvas-card); color: var(--canvas-text); }
+.workArea h2 { font: 700 24px/1 var(--font-pixelify), sans-serif; }
+.workArea p { font-size: 13px; line-height: 1.5; }
+.workArea form { display: grid; gap: 8px; }
+.workArea .workWriting { min-height: 270px; flex: 1; resize: vertical; line-height: 1.7; }
+.workArea details label { display: block; margin-top: 8px; }
+.workArea .actions span { font-size: 11px; }
+.coinCount { font: 700 16px var(--font-pixelify), sans-serif; white-space: nowrap; }
+.rewardToast { position: fixed; z-index: 40; top: 76px; left: 50%; transform: translateX(-50%); background: var(--mint); color: var(--ink); border: 2px solid var(--ink); padding: 8px 14px; box-shadow: 3px 3px 0 var(--ink); font-size: 13px; pointer-events: none; }
+.rewardToast:empty { display: none; }
+.composer[hidden] { display: none; }
+.mathCard { width: 420px; padding: 18px; border: 3px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: 5px 5px 0 var(--canvas-line); }
+.mathCard h3 { font: 700 20px/1.2 var(--font-pixelify), sans-serif; }
+.mathCard .actions { margin-top: 12px; }
+.mathFormula { max-width: 100%; overflow-x: auto; padding: 12px 0; font-size: 24px; }
+.mathSource { font: 12px/1.4 monospace; overflow-wrap: anywhere; margin-bottom: 8px; }
+.mathNote { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.mathForm { display: grid; gap: 8px; margin: 14px 0; font-size: 13px; }
+.mathForm p:empty { display: none; }
+.mathRange { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mathRange label { display: grid; gap: 5px; }
+.functionPlot { display: block; width: 100%; background: #fffdfa; border: 1px solid #ccc2d8; }
+.functionPlot text { font: 10px var(--font-atkinson), sans-serif; fill: #40314f; }
+.mathCard input[type="range"] { padding: 4px 0; border: 0; accent-color: #714caf; }
+.mathCard output { display: block; font-size: 13px; }
+.mathCard table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mathCard :is(th, td) { border-bottom: 1px solid #ccc2d8; padding: 5px; text-align: right; }
+.mathCard summary { cursor: pointer; font-size: 13px; }
+@media (max-width: 1000px) { .canvasHeader h1 { display: none; } }
+@media (max-width: 760px) {
+ .workspaceLayout[data-work-open="true"] { grid-template-columns: minmax(0, 1fr); }
+ .workspaceLayout[data-work-open="true"] .board { display: none; }
+ .workArea { border-left: 0; padding: 20px 20px 130px; }
+ .canvasHeader { gap: 8px; padding: 8px; }
+ .canvasHeader :global(.pixel-button) { padding: 6px; min-height: 40px; font-size: 11px; }
+ .coinCount { font-size: 12px; }
+ .rewardToast { top: 70px; width: max-content; max-width: 90vw; }
+}
+
+@media (min-width: 761px) { .shell[data-work-open="true"] .companion { right: calc(max(320px, 36vw) + 24px); } }

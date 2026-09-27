@@ -2,6 +2,8 @@
 // DRAFT: proposed shapes for the team to review with Chris before anyone builds on them.
 // Types for these shapes live in contracts.ts, derived from the schemas so the two never drift.
 import { z } from "zod";
+import { pipActionSchema, referencedCardIds } from "./pip-actions";
+import { mathItemSchema } from "./math-items";
 
 const id = z.string().min(1).max(64);
 
@@ -100,6 +102,7 @@ export const workspaceStateSchema = z
     assignment: z.string().max(5000),
     requirements: z.array(requirementSchema).max(20),
     cards: z.array(cardSchema).max(100),
+    mathItems: z.array(mathItemSchema).max(12).optional(),
     connections: z.array(connectionSchema).max(200),
     outlineOrder: z.array(id).max(100),
     selectedCardIds: z.array(id).max(100),
@@ -110,6 +113,8 @@ export const workspaceStateSchema = z
     revision: z.number().int().min(0),
     coins: z.number().int().min(0),
     rewardEventIds: z.array(z.string().max(100)).max(500),
+    // Optional for version-1 saves. Retained on Undo so delivered calls cannot replay.
+    processedPipActionIds: z.array(z.string().min(1).max(200)).max(2000).optional(),
     ownedDecorations: z.array(z.string().max(64)).max(100),
     pending: pendingSuggestionsSchema,
   })
@@ -132,6 +137,8 @@ export const workspaceStateSchema = z
     reportDuplicateValues(workspace.outlineOrder, "outlineOrder", ctx);
     reportDuplicateValues(workspace.selectedCardIds, "selectedCardIds", ctx);
     reportDuplicateValues(workspace.rewardEventIds, "rewardEventIds", ctx);
+    reportDuplicateValues([...workspace.cards.map(card => card.id), ...(workspace.mathItems ?? []).map(item => item.id)], "canvasIds", ctx);
+    reportDuplicateValues(workspace.processedPipActionIds ?? [], "processedPipActionIds", ctx);
     reportDuplicateValues(workspace.ownedDecorations, "ownedDecorations", ctx);
 
     const cardIds = new Set(workspace.cards.map(({ id }) => id));
@@ -198,6 +205,7 @@ export const pipTurnResponseSchema = z.object({
   suggestedCards: z.array(suggestedCardSchema).max(5),
   suggestedNextStep: nextStepSuggestionSchema.nullable(),
   proposedActions: z.array(proposedActionSchema).max(5),
+  actions: z.array(pipActionSchema).max(5).optional(),
 });
 
 // A model response must be checked against the exact request it answers. Shape
@@ -222,6 +230,9 @@ export function pipTurnResponseForRequestSchema(
     }
 
     const cardIds = new Set(request.workspace.cards.map(({ id }) => id));
+    response.actions?.forEach((action, index) => {
+      referencedCardIds(action).forEach(cardId => reportMissingCard(cardId, cardIds, ["actions", index], ctx));
+    });
     reportDuplicateValues(response.highlightedCardIds, "highlightedCardIds", ctx);
     response.highlightedCardIds.forEach((cardId, index) => {
       reportMissingCard(cardId, cardIds, ["highlightedCardIds", index], ctx);

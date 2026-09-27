@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModalHost, type ModalTarget as ModalTargetType } from "@/components/modals/ModalHost";
 import { useWorkspace } from "@/components/board/workspace-provider";
+import { WorkArea } from "@/components/board/WorkArea";
 import { IdeaBoard } from "@/components/board/idea-board";
 import { PipCompanion } from "@/components/pip/PipCompanion";
 import { RoomScene } from "./RoomScene";
@@ -12,8 +13,10 @@ import styles from "@/components/board/workspace.module.css";
 export type ModalTarget = ModalTargetType;
 export type PipOrigin = { x: number; y: number } | null;
 export function RoomHub() {
-  const { workspace, saveStatus } = useWorkspace();
+  const { workspace, saveStatus, rewardStatus } = useWorkspace();
   const [view, setView] = useState<"room" | "canvas">("room");
+  const [workOpen, setWorkOpen] = useState(true);
+  const [pipMode, setPipMode] = useState<"voice" | "text">("text");
   const [night, setNight] = useState(false);
   const [openModal, setOpenModal] = useState<ModalTarget>(null);
   const [pipOpen, setPipOpen] = useState(false);
@@ -31,17 +34,19 @@ export function RoomHub() {
     });
   }, []);
   const handleOpen = useCallback((target: Exclude<ModalTarget, null>, element: HTMLElement) => {
-    if (target === "board") {
+    if (target === "board" || target === "notebook" || target === "mic" || target === "pip") {
       const rect = document.querySelector(".pip-hit")?.getBoundingClientRect();
       setOrigin(rect ? { x: rect.x, y: rect.y } : null);
-      setPipOpen(false);
       setView("canvas");
-      requestAnimationFrame(() => canvasHeading.current?.focus());
-      return;
-    }
-    if (target === "mic" || target === "pip") {
-      setPipOpen(true);
-      requestAnimationFrame(() => document.getElementById("pip-message")?.focus());
+      setWorkOpen(target === "notebook");
+      setPipOpen(target === "mic" || target === "pip");
+      setPipMode(target === "mic" ? "voice" : "text");
+      requestAnimationFrame(() => {
+        if (target === "notebook") document.getElementById("work-writing")?.focus();
+        else if (target === "mic") document.getElementById("pip-voice-start")?.focus();
+        else if (target === "pip") document.getElementById("pip-message")?.focus();
+        else canvasHeading.current?.focus();
+      });
       return;
     }
     opener.current = element;
@@ -60,24 +65,27 @@ export function RoomHub() {
       roomCanvasButton.current = false;
     }
   }, [view]);
-  const pipLine = workspace.conversation.findLast(turn => turn.role === "pip")?.text ?? "This could be one of your two examples. Did they know each other before?";
-  return <div className={`${styles.shell} ${night ? "night-mode" : ""}`} data-view={view}>
+  const pipLine = workspace.conversation.findLast(turn => turn.role === "pip")?.text ?? "What’s on your mind? A problem, a plan, or something you’re stuck on — start anywhere.";
+  return <div className={`${styles.shell} ${night ? "night-mode" : ""}`} data-view={view} data-work-open={workOpen}>
     <div id="workspace-content">
       {view === "room" ? <RoomScene workspace={workspace} pipLine={pipLine} notebookWordCount={workspace.notebookText.trim() ? workspace.notebookText.trim().split(/\s+/).length : 0} onOpen={handleOpen} night={night} onToggleTheme={toggleTheme} /> :
         <main className={styles.canvasPage}>
           <header className={styles.canvasHeader}>
             <button type="button" className="pixel-button tone-cream" onClick={backToRoom}>← ROOM</button>
-            <h1 ref={canvasHeading} tabIndex={-1}>Your canvas</h1>
+            <h1 ref={canvasHeading} tabIndex={-1}>Your workspace</h1>
             <div className={styles.headerActions}>
               <span className={styles.save} role="status">{saveStatus}</span>
-              <button type="button" className="pixel-button tone-cream" onClick={event => handleOpen("notebook", event.currentTarget)}>NOTEBOOK</button>
+              <span className={styles.coinCount} aria-label={`${workspace.coins} coin${workspace.coins === 1 ? "" : "s"}`}>{workspace.coins} coin{workspace.coins === 1 ? "" : "s"}</span>
+              <button type="button" className="pixel-button tone-cream" aria-pressed={workOpen} onClick={() => setWorkOpen(value => !value)}>{workOpen ? "CANVAS ONLY" : "WORK AREA"}</button>
+              <button type="button" className="pixel-button tone-cream" onClick={event => handleOpen("clear", event.currentTarget)}>CLEAR</button>
               <ThemeToggle night={night} onToggle={toggleTheme} />
             </div>
           </header>
-          <IdeaBoard />
+          <div className={styles.workspaceLayout} data-work-open={workOpen}><IdeaBoard />{workOpen && <WorkArea />}</div>
         </main>}
-      <PipCompanion canvasMode={view === "canvas"} expanded={pipOpen} onExpandedChange={setPipOpen} origin={origin} />
+      <PipCompanion canvasMode={view === "canvas"} expanded={pipOpen} onExpandedChange={setPipOpen} origin={origin} preferredMode={pipMode} />
     </div>
+    <div className={styles.rewardToast} role="status" aria-live="polite">{rewardStatus}</div>
     <ModalHost open={openModal} onClose={handleClose} pipLine={pipLine} />
   </div>;
 }

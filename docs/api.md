@@ -7,8 +7,9 @@ the schemas ever disagree, the schemas win. Please update this page.
 ## POST /api/pip/turn
 
 One coaching turn with Pip. The browser sends the current workspace and what the
-user typed; Pip replies with a short message and optional suggestions. Pip never
-changes the workspace itself. The browser decides what to apply.
+user typed; Pip replies with a short message, actions, and optional suggestions.
+The browser validates and commits the actions as one undoable batch before showing
+the reply. The server never writes the browser workspace itself.
 
 - Real replies come from Gemini (`src/lib/ai/pip.ts`). Each call uses the team's
   Gemini quota.
@@ -41,6 +42,7 @@ Full example: [`samples/pip-turn-request.json`](samples/pip-turn-request.json).
 | `suggestedRequirements` | `{ suggestionId, text }[]` | Requirements Pip noticed. Currently always empty from Gemini. |
 | `suggestedCards` | `{ suggestionId, text, kind }[]` | New card ideas (up to 5). Show them as suggestions; add to the board only if the user accepts. |
 | `suggestedNextStep` | `{ suggestionId, text }` or `null` | One small next action. |
+| `actions` | array (optional for older clients) | Up to 5 validated actions from `src/lib/pip-actions.ts`: add_idea, add_step, edit_card, connect_cards, complete_step, highlight_cards, set_goal, plot_function, show_equation. References must name existing cards. The browser assigns new resource IDs and applies these atomically. |
 | `proposedActions` | array | Up to 5 of `{ type: "highlight", cardIds }`, `{ type: "move-aside", cardId }`, `{ type: "connect", fromCardId, toCardId }`. Every card ID is checked to exist. |
 
 Full example (written from the demo fixtures, not a recorded Gemini reply):
@@ -88,5 +90,23 @@ key, use `npm run smoke:api -- --allow-ai-unavailable` to permit only
 replies matching the request ID, revision, and existing cards. Malformed replies
 and `invalid_ai_output` always fail, including in offline mode.
 
+Run `npm run test:pip-actions` for action validation, atomic commits, stale calls,
+Undo, replay protection and save/reload. `processedPipActionIds` is an optional
+workspace field for compatibility with existing saves; it retains handled call
+IDs through Undo. After 2,000 action batches the app rejects new Pip mutations
+instead of evicting replay protection. Manual changes remain available.
+
 Run `npm run test:api` for local regression checks of interrupted/oversized bodies
 and the smoke test's success and failure detection; no Gemini key is needed.
+
+## Math actions and saved visuals
+
+`plot_function` requires `expression`, `xMin`, and `xMax`. `show_equation` requires
+`expression`. They are additions with app-assigned IDs; manual controls edit,
+move and remove visuals. The optional `workspace.mathItems` array stores up to 12
+items with `id`, `kind` (`graph` or `equation`), `expression`, `xMin`, `xMax`, and
+`position`. Validation rejects unsupported expressions; a bad action rejects the
+whole batch. Math items do not masquerade as card IDs or earn idea coins.
+
+Pip receives existing math items and approximate sampled zeros through the same
+context builder used for voice and text. See `math.md` for notation and limits.

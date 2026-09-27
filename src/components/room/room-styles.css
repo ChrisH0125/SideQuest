@@ -1490,3 +1490,44 @@
   .room-mobile-actions { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; gap: 12px; justify-content: center; }
   .room-mobile-actions .pixel-button { min-height: 44px; }
 }
+
+/* Extend the room to the viewport; keep the furniture's proportions intact. */
+.app-stage { display: block; padding: 0; overflow: hidden; }
+.hero-frame { width: 100%; height: 100dvh; aspect-ratio: auto; }
+.hero-frame .game-shell { border: 0; box-shadow: none; }
+.hero-frame .room { height: calc(100% - 100px); }
+.hero-frame .wall { height: calc(100% - 301px); }
+.hero-frame .baseboard { top: auto; bottom: 283px; }
+.hero-frame .board-hit { left: calc(50% - 215px); top: auto; bottom: 100px; }
+.hero-frame .window { top: auto; bottom: 120px; }
+.hero-frame .desk { width: 620px; left: calc(50% - 310px); right: auto; }
+.hero-frame .notebook-hit { left: calc(50% - 215px); }
+.hero-frame .recorder-hit { left: calc(50% + 85px); }
+.hero-frame .rug { left: calc(50% - 177px); }
+.hero-frame .speech-bubble { left: calc(50% - 158px); }
+.hero-frame .pip-hit { left: calc(50% - 74px); }
+.room-item { position: absolute; z-index: 9; width: 90px; height: 90px; pointer-events: none; }
+.room-item svg { width: 100%; height: 100%; }
+.room-item-plant { left: calc(50% - 380px); top: 70px; width: 110px; height: 110px; }
+.room-item-lamp { left: calc(50% + 220px); top: -140px; }
+.room-item-poster { left: calc(50% - 350px); top: -290px; }
+.room-item-fish-bowl { left: calc(50% - 305px); top: -130px; }
+.room-item-rainbow-rug { left: calc(50% - 190px); top: 70px; width: 380px; height: 260px; z-index: 2; }
+@media (max-width: 760px) {
+ .hero-frame { height: calc(100dvh - 68px); }
+ .hero-frame .game-shell { transform-origin: top left; }
+ .hero-frame .top-strip { grid-template-columns: 1fr auto; padding: 0 24px; }
+ .hero-frame .top-actions { display: none; }
+ .hero-frame .window { width: 90px; height: 90px; bottom: 310px; }
+ .hero-frame .window-left { left: 50px; }
+ .hero-frame .window-right { right: 50px; }
+ .hero-frame .status-rail { font-size: 11px; }
+ .hero-frame .status-block { padding: 0 10px; gap: 7px; }
+ .hero-frame .progress { display: none; }
+ .room-mobile-actions { bottom: 0; height: 68px; align-items: center; background: var(--paper); border-top: 3px solid var(--ink); }
+ .room-mobile-actions .pixel-button { padding: 7px 10px; }
+ .room-item-plant { left: 12px; }
+ .room-item-lamp { left: auto; right: 8px; }
+ .room-item-poster { left: 30px; top: -270px; width: 65px; }
+ .room-item-fish-bowl { left: 8px; width: 70px; }
+}

@@ -1,11 +1,20 @@
 import type { Card, PipTurnResponse, ProposedAction, WorkspaceState } from "./contracts";
-import { buyDecoration, rewardIdeaAccepted, type DecorationId } from "./rewards";
+import { buyDecoration, rewardIdeaAccepted, rewardStepCompleted, type DecorationId } from "./rewards";
 import { workspaceStateSchema, pipTurnResponseSchema } from "./schemas";
+import { commandFromPipAction, pipActionBatchSchema, referencedCardIds, type PipActionBatch } from "./pip-actions";
+import { mathItemSchema, type MathItem } from "./math-items";
+import { sampleFunction } from "./math";
 
 export type WorkspaceCommand =
+  | { type: "add-math"; item: MathItem }
+  | { type: "edit-math"; item: MathItem }
+  | { type: "move-math"; itemId: string; position: MathItem["position"] }
+  | { type: "remove-math"; itemId: string }
   | { type: "update-assignment"; text: string }
   | { type: "check-requirement"; requirementId: string; checked: boolean }
   | { type: "add-card"; card: Card }
+  | { type: "clear-canvas" }
+  | { type: "complete-step"; cardId: string }
   | { type: "edit-card"; cardId: string; text: string }
   | { type: "select-cards"; cardIds: string[] }
   | { type: "move-card"; cardId: string; position: Card["position"] }
@@ -16,7 +25,8 @@ export type WorkspaceCommand =
   | { type: "dismiss-requirement"; suggestionId: string }
   | { type: "accept-card"; suggestionId: string; cardId: string; position: Card["position"] }
   | { type: "dismiss-card"; suggestionId: string }
-  | { type: "apply-pip-turn"; userText: string; response: PipTurnResponse }
+  | { type: "apply-pip-turn"; userText: string; response: PipTurnResponse; resourceIds?: string[] }
+  | { type: "apply-pip-actions"; batch: PipActionBatch }
   | { type: "buy-decoration"; decorationId: DecorationId };
 
 export type WorkspaceHistory = {
@@ -57,21 +67,71 @@ export function applyWorkspaceCommand(
   const cardIds = new Set(workspace.cards.map(({ id }) => id));
 
   switch (command.type) {
+    case "add-math": case "edit-math": {
+      const parsed = mathItemSchema.safeParse(command.item);
+      if (!parsed.success) return unchanged(workspace, parsed.error.issues[0]?.message ?? "Check the math expression.");
+      const items = workspace.mathItems ?? [];
+      const exists = items.some(item => item.id === parsed.data.id);
+      if (command.type === "edit-math" && !exists) return unchanged(workspace, "That visual no longer exists.");
+      if (command.type === "add-math" && (exists || cardIds.has(parsed.data.id))) return unchanged(workspace, "That visual already exists.");
+      try { if (parsed.data.kind === "graph") sampleFunction(parsed.data.expression, parsed.data.xMin, parsed.data.xMax); }
+      catch (error) { return unchanged(workspace, error instanceof Error ? error.message : "Cannot plot this expression."); }
+      return accepted(workspace, { selectedCardIds: command.type === "add-math" ? [] : workspace.selectedCardIds, mathItems: command.type === "add-math" ? [...items, parsed.data] : items.map(item => item.id === parsed.data.id ? parsed.data : item) });
+    }
+    case "move-math": {
+      if (!workspace.mathItems?.some(item => item.id === command.itemId)) return unchanged(workspace, "That visual no longer exists.");
+      return accepted(workspace, { mathItems: workspace.mathItems.map(item => item.id === command.itemId ? { ...item, position: command.position } : item) });
+    }
+    case "remove-math": {
+      if (!workspace.mathItems?.some(item => item.id === command.itemId)) return unchanged(workspace, "That visual no longer exists.");
+      return accepted(workspace, { mathItems: workspace.mathItems.filter(item => item.id !== command.itemId) });
+    }
+    case "apply-pip-actions": {
+      const parsed = pipActionBatchSchema.safeParse(command.batch);
+      if (!parsed.success) return unchanged(workspace, "Pip sent an invalid action. Nothing changed.");
+      const batch = parsed.data;
+      const processed = workspace.processedPipActionIds ?? [];
+      if (processed.includes(batch.batchId)) return { ok: true, workspace };
+      if (batch.basedOnRevision !== workspace.revision) return unchanged(workspace, "The workspace changed while Pip was responding. Ask Pip to try again.");
+      if (processed.length >= 2000) return unchanged(workspace, "This workspace has reached its Pip action limit. You can still edit cards yourself.");
+      let next = workspace;
+      for (const [index, action] of batch.actions.entries()) {
+        if (referencedCardIds(action).some(id => !next.cards.some(card => card.id === id))) {
+          return unchanged(workspace, "Pip referred to a card that no longer exists. Nothing changed.");
+        }
+        const result = applyWorkspaceCommand(next, commandFromPipAction(action, batch.resourceIds[index], next));
+        if (!result.ok) return unchanged(workspace, result.reason + " No Pip actions were applied.");
+        next = result.workspace;
+      }
+      // Commit a batch as one revision and one Undo, even when it contains several actions.
+      return accepted(workspace, { ...next, processedPipActionIds: [...processed, batch.batchId] });
+    }
     case "update-assignment":
-      return accepted(workspace, { assignment: command.text });
+      return accepted(workspace, { assignment: command.text, requirements: [], pending: { ...workspace.pending, requirements: [] } });
     case "check-requirement":
       return accepted(workspace, { requirements: workspace.requirements.map((item) => item.id === command.requirementId ? { ...item, checked: command.checked } : item) });
+    case "clear-canvas":
+      return accepted(workspace, { cards: [], ...(workspace.mathItems ? { mathItems: [] } : {}), connections: [], outlineOrder: [], selectedCardIds: [], currentStepId: null, pending: { requirements: [], cards: [], nextStep: null } });
+    case "complete-step": {
+      const card = workspace.cards.find(item => item.id === command.cardId);
+      if (!card || card.kind !== "step") return unchanged(workspace, "Select a step to complete.");
+      if (card.status === "done") return unchanged(workspace, "This step is already complete.");
+      const next = { ...workspace, cards: workspace.cards.map(item => item.id === card.id ? { ...item, status: "done" as const } : item) };
+      return accepted(workspace, rewardStepCompleted(next, card.id).workspace);
+    }
     case "add-card": {
       const text = command.card.text.trim();
       if (!text || text.length > 500) return unchanged(workspace, "Card text must be 1–500 characters.");
       if (cardIds.has(command.card.id)) return unchanged(workspace, "That card already exists.");
 
       const card = { ...command.card, text };
-      return accepted(workspace, {
+      const next = {
+        ...workspace,
         cards: [...workspace.cards, card],
         outlineOrder: card.kind === "idea" ? [...workspace.outlineOrder, card.id] : workspace.outlineOrder,
         selectedCardIds: [card.id],
-      });
+      };
+      return accepted(workspace, rewardIdeaAccepted(next, card.id).workspace);
     }
     case "edit-card": {
       const text = command.text.trim();
@@ -240,10 +300,20 @@ export function applyWorkspaceCommand(
       if (command.response.basedOnRevision !== workspace.revision) {
         return unchanged(workspace, "Pip answered an older version of the workspace.");
       }
+      let next = workspace;
+      if (command.response.actions?.length) {
+        const result = applyWorkspaceCommand(workspace, { type: "apply-pip-actions", batch: {
+          batchId: `typed:${command.response.requestId}`, basedOnRevision: command.response.basedOnRevision,
+          actions: command.response.actions, resourceIds: command.resourceIds ?? [],
+        } });
+        if (!result.ok) return result;
+        next = result.workspace;
+      }
       const highlightedCardIds = command.response.highlightedCardIds.filter((id) => cardIds.has(id));
       return accepted(workspace, {
+        ...next,
         selectedCardIds:
-          highlightedCardIds.length > 0 ? highlightedCardIds : workspace.selectedCardIds,
+          highlightedCardIds.length > 0 ? highlightedCardIds : next.selectedCardIds,
         conversation: [
           ...workspace.conversation,
           { role: "user" as const, text: command.userText },
@@ -251,11 +321,11 @@ export function applyWorkspaceCommand(
         ].slice(-20),
         pending: {
           requirements: mergeSuggestions(
-            workspace.pending.requirements,
+            next.pending.requirements,
             command.response.suggestedRequirements,
           ).slice(-20),
-          cards: mergeSuggestions(workspace.pending.cards, command.response.suggestedCards).slice(-20),
-          nextStep: command.response.suggestedNextStep ?? workspace.pending.nextStep,
+          cards: mergeSuggestions(next.pending.cards, command.response.suggestedCards).slice(-20),
+          nextStep: command.response.suggestedNextStep ?? next.pending.nextStep,
         },
       });
     }
@@ -313,6 +383,7 @@ export function workspaceHistoryReducer(
         conversation: state.workspace.conversation,
         coins: state.workspace.coins,
         rewardEventIds: state.workspace.rewardEventIds,
+        ...(state.workspace.processedPipActionIds ? { processedPipActionIds: state.workspace.processedPipActionIds } : {}),
         ownedDecorations: state.workspace.ownedDecorations,
         revision: state.workspace.revision + 1,
       },
@@ -321,7 +392,7 @@ export function workspaceHistoryReducer(
   }
 
   const result = applyWorkspaceCommand(state.workspace, action.command);
-  if (!result.ok) return state;
+  if (!result.ok || result.workspace === state.workspace) return state;
 
   if (action.command.type === "update-notebook" || action.command.type === "buy-decoration" || action.command.type === "select-cards") {
     return { ...state, workspace: result.workspace };

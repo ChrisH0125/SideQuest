@@ -2,10 +2,9 @@
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspaceState } from "@/lib/contracts";
-import { IdeaBoard } from "@/components/board/idea-board";
 import { useWorkspace } from "@/components/board/workspace-provider";
 import { DECORATIONS, type DecorationId } from "@/lib/rewards";
-import { downloadFile, notebookExport } from "@/lib/export";
+import { DecorationArt } from "@/components/room/DecorationArt";
 import styles from "./modals.module.css";
 
 export type ModalTarget =
@@ -13,6 +12,7 @@ export type ModalTarget =
   | "board"
   | "mic"
   | "pip"
+  | "clear"
   | "shop"
   | null;
 
@@ -35,16 +35,13 @@ export function ModalHost({
       footer={<FooterCloseButton onClose={onClose} />}
       wide={open === "board"}
     >
-      {open === "notebook" && (
-        <NotebookModal
-          text={workspace.notebookText}
-          onChange={(text) => runCommand({ type: "update-notebook", text })}
-          workspace={workspace}
-        />
-      )}
-      {open === "board" && <BoardModal />}
-      {open === "mic" && <p>Talk with Pip beside your canvas.</p>}
-      {open === "pip" && <p>Pip is beside your canvas.</p>}
+      {open === "clear" && <>
+        <p>Clear all canvas cards, equations, graphs, and pending suggestions? Your goal, written work, coins, and room items stay saved. You can Undo this.</p>
+        <button type="button" className={styles.btn} onClick={() => {
+          const result = runCommand({ type: "clear-canvas" });
+          if (result.ok) onClose();
+        }}>Clear canvas</button>
+      </>}
       {open === "shop" && <ShopModal />}
     </ModalFrame>
   );
@@ -52,6 +49,8 @@ export function ModalHost({
 
 function modalTitle(target: Exclude<ModalTarget, null>, workspace: WorkspaceState) {
   switch (target) {
+    case "clear":
+      return "CLEAR CANVAS?";
     case "notebook":
       return "NOTEBOOK — PG 1";
     case "board":
@@ -152,119 +151,6 @@ function FooterCloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ---------------- Notebook (fully working, with assignment + reqs at top) ----------------
-
-type NotebookModalProps = {
-  text: string;
-  onChange: (next: string) => void;
-  workspace: WorkspaceState;
-};
-
-function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
-  const { runCommand, saveStatus } = useWorkspace();
-  const [taskStatus, setTaskStatus] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const words = text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
-  const doneCount = workspace.requirements.filter((r) => r.checked).length;
-  const pendingReq = workspace.pending.requirements[0];
-
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(event.target.value);
-  };
-
-  return (
-    <>
-      <div className={styles.assignBlock}>
-        <h3>ASSIGNMENT</h3>
-        <p>{workspace.assignment}</p>
-        <details>
-          <summary>Change assignment or task</summary>
-          <form onSubmit={event => {
-            event.preventDefault();
-            const result = runCommand({ type: "update-assignment", text: String(new FormData(event.currentTarget).get("assignment")) });
-            setTaskStatus(result.ok ? "Task updated. Your cards and draft are kept." : result.reason);
-          }}>
-            <label htmlFor="assignment-text">What are you working on?</label>
-            <textarea key={workspace.assignment} id="assignment-text" name="assignment" defaultValue={workspace.assignment} rows={3} maxLength={5000} />
-            <button type="submit" className={styles.btn}>Update task</button>
-            <p role="status">{taskStatus}</p>
-          </form>
-        </details>
-        <div className={styles.reqInline}>
-          {workspace.requirements.map((req) => (
-            <label key={req.id} className={styles.reqInlineItem}><input type="checkbox" checked={req.checked} onChange={event => runCommand({ type: "check-requirement", requirementId: req.id, checked: event.target.checked })} />{req.text}</label>
-          ))}
-        </div>
-        {pendingReq && (
-          <div className={styles.reqPendingRow}>
-            <div className={styles.reqPendingLabel}>PIP SUGGESTS</div>
-            {pendingReq.text}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                type="button"
-                className={styles.btn}
-                onClick={() => runCommand({
-                  type: "accept-requirement",
-                  suggestionId: pendingReq.suggestionId,
-                  requirementId: `requirement-${crypto.randomUUID()}`,
-                })}
-              >
-                ✓ Add to list
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.secondary}`}
-                onClick={() => runCommand({
-                  type: "dismiss-requirement",
-                  suggestionId: pendingReq.suggestionId,
-                })}
-              >
-                ✗ Skip
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className={styles.nbToolbar}>
-        <button type="button" className={styles.btn} onClick={() => downloadFile(notebookExport(workspace))}>Download draft</button>
-        <div className={styles.reqSummary}>
-          <b>{doneCount} / {workspace.requirements.length}</b> requirements ·
-          Rev {workspace.revision}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className={styles.nbWordCount}>
-            {words} {words === 1 ? "word" : "words"}
-          </span>
-          <span className={styles.note} role="status">{saveStatus}</span>
-        </div>
-      </div>
-      <div className={styles.nbPage}>
-        <textarea
-          ref={textareaRef}
-          data-autofocus
-          aria-label="Notebook draft"
-          maxLength={50000}
-          className={styles.nbTextarea}
-          value={text}
-          onChange={handleChange}
-          placeholder="Start writing your draft. Type freely — Pip watches from the room."
-        />
-      </div>
-      <div className={styles.note}>
-        Saves stay in this browser. Check the save status above before leaving.
-      </div>
-    </>
-  );
-}
-
-// ---------------- Board ----------------
-
-function BoardModal() {
-  return <IdeaBoard embedded />;
-}
-
 // ---------------- Shop ----------------
 
 const SHOP_ITEMS = (Object.keys(DECORATIONS) as DecorationId[]).map(id => ({ id }));
@@ -283,6 +169,7 @@ function ShopModal() {
           const needed = decoration.cost - workspace.coins;
           return (
             <div key={item.id} className={styles.shopTile}>
+              <div className={styles.shopArt}><DecorationArt item={item.id} /></div>
               <div className={styles.shopName}>{decoration.name}</div>
               <div className={styles.shopCost}>{decoration.cost} coins</div>
               <button
@@ -292,7 +179,7 @@ function ShopModal() {
                 disabled={owned || !affordable}
                 onClick={() => {
                   const result = runCommand({ type: "buy-decoration", decorationId: item.id });
-                  setStatus(result.ok ? `${decoration.name} added to your collection.` : result.reason);
+                  setStatus(result.ok ? `${decoration.name} placed in your room.` : result.reason);
                 }}
               >
                 {owned ? "Owned" : affordable ? "Buy" : `Need ${needed} more`}
@@ -303,7 +190,7 @@ function ShopModal() {
       </div>
       <p className={styles.shopStatus} role="status" aria-live="polite">{status}</p>
       <div className={styles.note}>
-        Collect items with earned coins. Your collection is listed in the room; furniture placement is not available yet.
+        Earn 1 coin for an idea and 3 for completing a step. Purchases appear in your room immediately and stay after reloading.
       </div>
     </>
   );

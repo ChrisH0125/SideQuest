@@ -8,8 +8,6 @@ import type { WorkspaceState } from "./contracts";
 
 export const IDEA_ACCEPTED_COINS = 1;
 export const STEP_COMPLETED_COINS = 3;
-// Only the first few ideas pay, so making lots of cards is not the best way to earn.
-export const PAID_IDEAS_PER_PROJECT = 5;
 
 export const DECORATIONS = {
   rug: { name: "Rug", cost: 5 },
@@ -32,8 +30,7 @@ const STEP_PREFIX = "step-completed:";
 // Call when the user accepts an idea card onto the board.
 export function rewardIdeaAccepted(workspace: WorkspaceState, cardId: string): RewardResult {
   const card = workspace.cards.find(({ id }) => id === cardId);
-  const paidIdeas = workspace.rewardEventIds.filter((key) => key.startsWith(IDEA_PREFIX)).length;
-  if (card?.kind !== "idea" || paidIdeas >= PAID_IDEAS_PER_PROJECT) return noReward(workspace);
+  if (card?.kind !== "idea") return noReward(workspace);
   return payOnce(workspace, IDEA_PREFIX + cardId, IDEA_ACCEPTED_COINS);
 }
 
