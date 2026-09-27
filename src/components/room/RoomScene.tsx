@@ -1,15 +1,18 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { WorkspaceState } from "@/lib/contracts";
 import { Pip } from "@/components/pip/Pip";
-import type { ModalTarget } from "./RoomHub";
-import styles from "./room.module.css";
+import type { ModalTarget } from "@/components/modals/ModalHost";
+import "./room-styles.css";
+
+type OpenFn = (target: Exclude<ModalTarget, null>, opener: HTMLElement) => void;
 
 type RoomSceneProps = {
   workspace: WorkspaceState;
   pipLine: string;
   notebookWordCount: number;
-  onOpen: (target: Exclude<ModalTarget, null>, opener: HTMLElement) => void;
+  onOpen: OpenFn;
 };
 
 export function RoomScene({
@@ -18,228 +21,264 @@ export function RoomScene({
   notebookWordCount,
   onOpen,
 }: RoomSceneProps) {
-  const handleOpen =
+  const openFrom =
     (target: Exclude<ModalTarget, null>) =>
     (event: React.MouseEvent<HTMLButtonElement>) => {
       onOpen(target, event.currentTarget);
     };
 
-  const pendingCardCount = workspace.pending.cards.length;
-  const [ideaOne, ideaTwo] = workspace.cards.filter((c) => c.kind === "idea");
-  const pendingCard = workspace.pending.cards[0];
-  const lastUserTurn = [...workspace.conversation].reverse().find((t) => t.role === "user");
-
   const totalReqs = workspace.requirements.length;
   const doneReqs = workspace.requirements.filter((r) => r.checked).length;
   const reqPct = totalReqs === 0 ? 0 : Math.round((doneReqs / totalReqs) * 100);
+  const questText =
+    workspace.pending.nextStep?.text ??
+    workspace.pending.cards[0]?.text ??
+    "KEEP GOING";
 
   return (
-    <div id="room-scene" className={styles.app}>
-      <header className={styles.topbar}>
-        <div className={styles.topbarLeft}>
-          <span
-            className={styles.coinChip}
+    <main id="room-scene" className="app-stage">
+      <div className="game-shell">
+        <div className="top-strip">
+          <div
+            className="coin-chip"
             aria-label={`${workspace.coins} coins earned`}
           >
-            <span className={styles.coinDot} />
-            {workspace.coins}
-          </span>
+            <Coin />
+            <span>{workspace.coins}</span>
+          </div>
+          <p className="wordmark" role="heading" aria-level={1}>
+            <b>S</b>ideQuest
+          </p>
+          <div className="top-actions">
+            <button
+              type="button"
+              aria-label="Open decoration shop"
+              onClick={openFrom("shop")}
+              className="pixel-button tone-pink shop-button"
+            >
+              <BagIcon /> SHOP
+            </button>
+          </div>
         </div>
-        <div className={styles.topbarCenter}>
-          <span className={styles.brand}>
-            <span className={styles.brandSide}>S</span>ideQuest
-          </span>
-        </div>
-        <div className={styles.topbarRight}>
-          <button
-            type="button"
-            className={styles.shopIcon}
-            onClick={handleOpen("shop")}
-            aria-label="Open the shop"
-          >
-            <ShopBagIcon />
-          </button>
-        </div>
-      </header>
 
-      <div
-        className={styles.statusRail}
-        aria-label={`${doneReqs} of ${totalReqs} requirements done, ${notebookWordCount} words drafted, revision ${workspace.revision}`}
-      >
-        <div className={styles.statusItem}>
-          <span className={styles.statusLabel}>REQUIREMENTS</span>
-          <span className={styles.progressBar} aria-hidden>
-            <span
-              className={styles.progressFill}
-              style={{ width: `${reqPct}%` }}
+        <div
+          className="status-rail"
+          aria-label={`${doneReqs} of ${totalReqs} requirements done, ${notebookWordCount} words drafted, quest ${questText}`}
+        >
+          <div className="status-block">
+            <span>REQUIREMENTS</span>
+            <div className="progress" aria-hidden>
+              <i style={{ width: `${reqPct}%` }} />
+            </div>
+            <b>
+              {doneReqs}/{totalReqs}
+            </b>
+          </div>
+          <div className="status-divider" />
+          <div className="status-block draft-status">
+            <span>DRAFT</span>
+            <b>{notebookWordCount} WORDS</b>
+          </div>
+          <div className="status-divider" />
+          <div className="status-block">
+            <span>QUEST</span>
+            <b>{questText.toUpperCase()}</b>
+          </div>
+        </div>
+
+        <div className="room">
+          <div className="wall">
+            <Window side="left" />
+            <button
+              type="button"
+              className="object-hit board-hit"
+              onClick={openFrom("board")}
+              aria-label="Open the idea board"
+            >
+              <CorkBoard workspace={workspace} />
+              <HoverLabel>CORK BOARD</HoverLabel>
+            </button>
+            <Window side="right" />
+          </div>
+
+          <div className="baseboard" />
+          <div className="floor">
+            <div className="floor-line line-a" />
+            <div className="floor-line line-b" />
+            <div className="floor-knot knot-a" />
+            <div className="floor-knot knot-b" />
+            <div className="floor-knot knot-c" />
+
+            <div className="desk" aria-hidden>
+              <div className="desk-backsplash" />
+              <div className="desk-front" />
+              <div className="desk-drawer"><i /></div>
+              <div className="desk-leg desk-leg-left" />
+              <div className="desk-leg desk-leg-right" />
+            </div>
+
+            <Notebook
+              onOpen={openFrom("notebook")}
+              wordCount={notebookWordCount}
+              hasText={notebookWordCount > 0}
             />
-          </span>
-          <span className={styles.statusValue}>
-            {doneReqs}/{totalReqs}
-          </span>
-        </div>
-        <span className={styles.statusDivider} aria-hidden />
-        <div className={styles.statusItem}>
-          <span className={styles.statusLabel}>DRAFT</span>
-          <span className={styles.statusValue}>{notebookWordCount} W</span>
-        </div>
-        <span className={styles.statusDivider} aria-hidden />
-        <div className={styles.statusItem}>
-          <span className={styles.statusLabel}>REV</span>
-          <span className={styles.statusValue}>{workspace.revision}</span>
+            <Recorder onOpen={openFrom("mic")} />
+
+            <div className="rug" aria-hidden><i /></div>
+
+            <div className="speech-bubble" role="status">
+              <b>PIP · ONE QUESTION</b>
+              <p>{pipLine}</p>
+            </div>
+
+            <button
+              type="button"
+              className="object-hit pip-hit"
+              onClick={openFrom("pip")}
+              aria-label="Open Pip customization"
+            >
+              <Pip />
+              <HoverLabel>PIP</HoverLabel>
+            </button>
+          </div>
         </div>
       </div>
+    </main>
+  );
+}
 
-      <div className={styles.room}>
-        <div className={styles.wall} aria-hidden />
-        <div className={styles.baseboard} aria-hidden />
-        <div className={styles.floor} aria-hidden />
-        <span className={`${styles.knot} ${styles.knot1}`} aria-hidden />
-        <span className={`${styles.knot} ${styles.knot2}`} aria-hidden />
-        <span className={`${styles.knot} ${styles.knot3}`} aria-hidden />
+// ---------------- Presentational sub-components ----------------
 
-        {/* WALL: left window */}
-        <div className={`${styles.objWindow} ${styles.objWindowLeft}`} aria-hidden>
-          <div className={styles.windowSun} />
-          <div className={styles.windowCloud} />
-          <div className={styles.windowCross} />
-        </div>
+function Coin({ small = false }: { small?: boolean }) {
+  return (
+    <span aria-hidden className={`coin${small ? " coin-small" : ""}`}>
+      <i />
+    </span>
+  );
+}
 
-        {/* WALL: corkboard */}
-        <button
-          type="button"
-          className={`${styles.roomObject} ${styles.objCorkboard}`}
-          onClick={handleOpen("board")}
-          aria-label="Open the idea board"
-        >
-          <div className={styles.corkboardBody}>
-            <span className={styles.corkboardTag}>IDEAS</span>
-            <span className={styles.corkboardRev}>REV {workspace.revision}</span>
-            {ideaOne && (
-              <div className={`${styles.miniCard} ${styles.mc1}`}>
-                <span className={styles.mcKind}>IDEA</span>
-                <div>{ideaOne.text}</div>
-              </div>
-            )}
-            {ideaOne && ideaTwo && <div className={styles.miniArrow} aria-hidden />}
-            {ideaTwo && (
-              <div className={`${styles.miniCard} ${styles.mc2}`}>
-                <span className={styles.mcKind}>IDEA</span>
-                <div>{ideaTwo.text}</div>
-              </div>
-            )}
-            {pendingCard && (
-              <div className={`${styles.miniCard} ${styles.mc3}`}>
-                <span className={styles.mcKind}>PIP</span>
-                <div>{pendingCard.text}</div>
-              </div>
-            )}
-            {pendingCardCount > 0 && (
-              <span className={styles.badge} aria-hidden>{pendingCardCount}</span>
-            )}
-          </div>
-          <span className={styles.objTag}>CORK BOARD</span>
-        </button>
+function BagIcon() {
+  return (
+    <span aria-hidden className="bag-icon">
+      <i />
+    </span>
+  );
+}
 
-        {/* WALL: right window */}
-        <div className={`${styles.objWindow} ${styles.objWindowRight}`} aria-hidden>
-          <div className={styles.windowSun} />
-          <div className={styles.windowCloud} />
-          <div className={styles.windowCross} />
-        </div>
+function HoverLabel({ children }: { children: ReactNode }) {
+  return <span className="hover-label">{children}</span>;
+}
 
-        {/* DESK */}
-        <div className={styles.deskLegs} aria-hidden>
-          <div className={`${styles.leg} ${styles.legLeft}`} />
-          <div className={`${styles.leg} ${styles.legRight}`} />
-        </div>
-        <div className={styles.deskTop} aria-hidden />
-
-        {/* DESK: notebook (clickable) */}
-        <button
-          type="button"
-          className={`${styles.roomObject} ${styles.objNotebook}`}
-          onClick={handleOpen("notebook")}
-          aria-label="Open the notebook"
-        >
-          <div className={styles.notebookBody}>
-            <span className={styles.notebookLiveCount}>{notebookWordCount} W</span>
-            <div className={styles.notebookPreview}>
-              {notebookWordCount > 0 ? "Draft in progress…" : "Draft appears here…"}
-            </div>
-            <div className={styles.notebookPageNum}>PG 1</div>
-          </div>
-          <span className={styles.objTag}>NOTEBOOK</span>
-        </button>
-
-        {/* DESK: tape recorder (clickable) */}
-        <button
-          type="button"
-          className={`${styles.roomObject} ${styles.objMic}`}
-          onClick={handleOpen("mic")}
-          aria-label="Open the microphone to talk to Pip"
-        >
-          <div className={styles.micBody}>
-            <div className={styles.micReelsStrip} aria-hidden>
-              <span className={styles.micReel} />
-              <span className={styles.micReel} />
-            </div>
-            <div className={styles.micLabelRow}>
-              <span className={styles.recDot} aria-hidden />
-              HOLD TO TALK
-            </div>
-            {pipLine && <span className={styles.badge} aria-hidden>!</span>}
-          </div>
-          <span className={styles.objTag}>TAPE RECORDER</span>
-        </button>
-
-        {/* FLOOR: rug */}
-        <div className={styles.rug} aria-hidden />
-
-        {/* FLOOR: Pip standing on the rug */}
-        <div className={styles.pipZone}>
-          <div className={styles.speech} role="status">
-            <div className={styles.speechWho}>PIP · ONE QUESTION</div>
-            <div className={styles.speechBody}>{pipLine}</div>
-            {lastUserTurn && (
-              <div className={styles.speechUser}>
-                You said: &ldquo;{lastUserTurn.text}&rdquo;
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className={styles.objPip}
-            onClick={handleOpen("pip")}
-            aria-label="Open Pip customization"
-          >
-            <Pip size={148} className={styles.pipBody} />
-            <span className={styles.objTag}>PIP</span>
-          </button>
-        </div>
-      </div>
+function Window({ side }: { side: "left" | "right" }) {
+  return (
+    <div className={`window window-${side}`} aria-hidden>
+      <div className="sky-orb" />
+      <div className="cloud"><i /><b /></div>
+      <div className="window-cross-x" />
+      <div className="window-cross-y" />
+      <div className="window-sill" />
     </div>
   );
 }
 
-function ShopBagIcon() {
+function CorkBoard({ workspace }: { workspace: WorkspaceState }) {
+  const [ideaOne, ideaTwo] = workspace.cards.filter((c) => c.kind === "idea");
+  const pending = workspace.pending.cards[0];
+  const pendingCount = workspace.pending.cards.length;
   return (
-    <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true">
-      {/* Handles */}
-      <rect x="5" y="2" width="1" height="3" fill="#2d1b3d" />
-      <rect x="10" y="2" width="1" height="3" fill="#2d1b3d" />
-      <rect x="6" y="2" width="4" height="1" fill="#2d1b3d" />
-      {/* Bag body outline */}
-      <rect x="3" y="5" width="10" height="1" fill="#2d1b3d" />
-      <rect x="2" y="6" width="1" height="8" fill="#2d1b3d" />
-      <rect x="13" y="6" width="1" height="8" fill="#2d1b3d" />
-      <rect x="2" y="13" width="12" height="1" fill="#2d1b3d" />
-      {/* Bag body fill */}
-      <rect x="3" y="6" width="10" height="7" fill="#ff6f59" />
-      {/* Coin symbol */}
-      <rect x="7" y="8" width="2" height="1" fill="#2d1b3d" />
-      <rect x="7" y="10" width="2" height="1" fill="#2d1b3d" />
-      <rect x="7" y="9" width="1" height="1" fill="#2d1b3d" />
-    </svg>
+    <div className="cork-board">
+      <div className="board-grain grain-a" />
+      <div className="board-grain grain-b" />
+      <div className="board-title">IDEAS</div>
+      <div className="board-check">✓</div>
+      <div className="tape tape-left" />
+      <div className="tape tape-right" />
+      <div className="idea-flow">
+        <div className="idea-card">
+          {ideaOne ? ideaOne.text : "First idea will appear here."}
+        </div>
+        <span className="flow-arrow">→</span>
+        <div className="idea-card">
+          {ideaTwo ? ideaTwo.text : "Second idea will appear here."}
+        </div>
+        <span className="flow-arrow">→</span>
+        <div className="idea-card pending-card">
+          {pending ? pending.text : "Pip's next suggestion."}
+        </div>
+      </div>
+      {pendingCount > 0 && (
+        <div className="notification-badge">{pendingCount}</div>
+      )}
+    </div>
+  );
+}
+
+function Recorder({
+  onOpen,
+}: {
+  onOpen: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="object-hit recorder-hit"
+      onClick={onOpen}
+      aria-label="Open the tape recorder to talk to Pip"
+    >
+      <div className="recorder">
+        <div className="recorder-handle" />
+        <div className="recorder-controls">
+          <i /><i /><i /><i />
+        </div>
+        <div className="cassette-window">
+          <div className="cassette-reel cassette-reel-left"><i /></div>
+          <div className="cassette-tape" />
+          <div className="cassette-reel cassette-reel-right"><i /></div>
+        </div>
+        <div className="speaker-grille">
+          <i /><i /><i /><i />
+        </div>
+        <div className="mic-grille"><i /><i /><i /></div>
+        <span className="rec-dot" />
+        <span className="rec-text">RECORDER</span>
+        <div className="recorder-label">HOLD TO TALK</div>
+      </div>
+      <div className="alert-badge">!</div>
+      <HoverLabel>TAPE RECORDER</HoverLabel>
+    </button>
+  );
+}
+
+function Notebook({
+  onOpen,
+  wordCount,
+  hasText,
+}: {
+  onOpen: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  wordCount: number;
+  hasText: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="object-hit notebook-hit"
+      onClick={onOpen}
+      aria-label="Open the notebook"
+    >
+      <div className="notebook">
+        <div className="notebook-tape" />
+        <div className="notebook-spine">
+          <i /><i /><i /><i />
+        </div>
+        <div className="notebook-margin" />
+        <div className="notebook-lines" />
+        <div className="notebook-copy">
+          <b>{hasText ? "DRAFT IN PROGRESS" : "START YOUR DRAFT"}</b>
+        </div>
+        <div className="word-sticker">{wordCount} WORDS</div>
+        <div className="pixel-pencil"><i /></div>
+      </div>
+      <HoverLabel>NOTEBOOK</HoverLabel>
+    </button>
   );
 }
