@@ -1,6 +1,6 @@
-# shellhacks
+# SideQuest
 
-Sidequest: a cozy pixel workspace that helps people start and keep going on an
+SideQuest: a cozy pixel workspace that helps people start and keep going on an
 overwhelming writing assignment, with Pip the pixel cat. See `AGENTS.md` for how
 we work.
 
@@ -18,8 +18,8 @@ Status: project scaffold only. No Pip, board, voice, or Gemini features exist ye
 Requires Node.js 20.9 or newer (24 LTS recommended), and npm.
 
 ```bash
-git clone https://github.com/ChrisH0125/shellhacks.git
-cd shellhacks
+git clone https://github.com/ChrisH0125/SideQuest.git
+cd SideQuest
 npm install
 cp .env.example .env.local
 ```
