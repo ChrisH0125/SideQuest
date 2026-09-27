@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "smoke:api": "node scripts/smoke-pip-api.mjs",
+    "test:api": "node --test scripts/pip-api.test.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
