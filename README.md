@@ -4,7 +4,11 @@ SideQuest: a cozy pixel workspace that helps people start and keep going on an
 overwhelming writing assignment, with Pip the pixel cat. See `AGENTS.md` for how
 we work.
 
-Status: project scaffold only. No Pip, board, voice, or Gemini features exist yet.
+Status: in progress. The Pip endpoint (Gemini), browser saving, coin rewards, and the
+pixel theme exist. The room, board, and notebook screens are being built. Voice is not
+started.
+
+Docs: [API](docs/api.md) · [Deployment](docs/deployment.md)
 
 ## Stack
 
@@ -35,6 +39,7 @@ Put real values in `.env.local`. Never commit it.
 | `npm run typecheck` | Check data types without building |
 | `npm run build` | Production build; run before any demo |
 | `npm start` | Run the production build |
+| `npm run smoke:api` | Test `/api/pip/turn` with good and bad requests (app must be running) |
 
 ## Folder layout
 

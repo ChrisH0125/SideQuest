@@ -1,0 +1,96 @@
+{
+  "requestId": "req-demo-1",
+  "revision": 3,
+  "workspace": {
+    "projectId": "demo-neighborhood-essay",
+    "title": "Persuasive essay: improving my neighborhood",
+    "assignment": "Write a persuasive essay about improving your neighborhood. Include two examples and a counterargument.",
+    "requirements": [
+      {
+        "id": "req-persuasive",
+        "text": "Argue for one improvement",
+        "checked": false
+      },
+      {
+        "id": "req-examples",
+        "text": "Include two examples",
+        "checked": false
+      },
+      {
+        "id": "req-counter",
+        "text": "Address a counterargument",
+        "checked": false
+      }
+    ],
+    "cards": [
+      {
+        "id": "card-gardens",
+        "text": "Community gardens",
+        "kind": "idea",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "status": "active",
+        "sourceUtterance": "Maybe community gardens."
+      },
+      {
+        "id": "card-grandma",
+        "text": "Grandma trades vegetables with her neighbor",
+        "kind": "idea",
+        "position": {
+          "x": 240,
+          "y": 80
+        },
+        "status": "active",
+        "sourceUtterance": "My grandma trades vegetables with her neighbor."
+      }
+    ],
+    "connections": [
+      {
+        "id": "conn-gardens-grandma",
+        "fromCardId": "card-gardens",
+        "toCardId": "card-grandma"
+      }
+    ],
+    "outlineOrder": [
+      "card-gardens",
+      "card-grandma"
+    ],
+    "selectedCardIds": [
+      "card-grandma"
+    ],
+    "currentStepId": null,
+    "notebookText": "",
+    "conversation": [
+      {
+        "role": "user",
+        "text": "Maybe community gardens. My grandma trades vegetables with her neighbor."
+      }
+    ],
+    "revision": 3,
+    "coins": 2,
+    "rewardEventIds": [
+      "idea-accepted:card-gardens",
+      "idea-accepted:card-grandma"
+    ],
+    "ownedDecorations": [],
+    "pending": {
+      "requirements": [
+        {
+          "suggestionId": "sugg-req-audience",
+          "text": "Write for your neighbors as the audience"
+        }
+      ],
+      "cards": [
+        {
+          "suggestionId": "sugg-card-cost",
+          "text": "Gardens are cheap to start",
+          "kind": "idea"
+        }
+      ],
+      "nextStep": null
+    }
+  },
+  "userText": "How does this fit?"
+}
