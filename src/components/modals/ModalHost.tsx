@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { WorkspaceState } from "@/lib/contracts";
 import { Pip } from "@/components/pip/Pip";
+import { IdeaBoard } from "@/components/board/idea-board";
+import { useWorkspace } from "@/components/board/workspace-provider";
+import { pipTurnResponseSchema } from "@/lib/schemas";
+import { DECORATIONS, type DecorationId } from "@/lib/rewards";
 import styles from "./modals.module.css";
 
 export type ModalTarget =
@@ -16,38 +20,34 @@ export type ModalTarget =
 type ModalHostProps = {
   open: ModalTarget;
   onClose: () => void;
-  workspace: WorkspaceState;
   pipLine: string;
-  notebookText: string;
-  onNotebookChange: (next: string) => void;
 };
 
 export function ModalHost({
   open,
   onClose,
-  workspace,
   pipLine,
-  notebookText,
-  onNotebookChange,
 }: ModalHostProps) {
+  const { workspace, runCommand } = useWorkspace();
   if (open === null) return null;
   return (
     <ModalFrame
       title={modalTitle(open, workspace)}
       onClose={onClose}
       footer={<FooterCloseButton onClose={onClose} />}
+      wide={open === "board"}
     >
       {open === "notebook" && (
         <NotebookModal
-          text={notebookText}
-          onChange={onNotebookChange}
+          text={workspace.notebookText}
+          onChange={(text) => runCommand({ type: "update-notebook", text })}
           workspace={workspace}
         />
       )}
-      {open === "board" && <BoardModal workspace={workspace} />}
+      {open === "board" && <BoardModal />}
       {open === "mic" && <MicModal workspace={workspace} pipLine={pipLine} />}
       {open === "pip" && <PipModal />}
-      {open === "shop" && <ShopModal workspace={workspace} />}
+      {open === "shop" && <ShopModal />}
     </ModalFrame>
   );
 }
@@ -73,33 +73,59 @@ type ModalFrameProps = {
   title: string;
   onClose: () => void;
   footer?: React.ReactNode;
+  wide?: boolean;
   children: React.ReactNode;
 };
 
-function ModalFrame({ title, onClose, footer, children }: ModalFrameProps) {
+function ModalFrame({ title, onClose, footer, wide = false, children }: ModalFrameProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const prevOverflow = document.body.style.overflow;
+    const room = document.getElementById("room-scene");
+    const roomWasInert = room?.inert ?? false;
     document.body.style.overflow = "hidden";
+    if (room) room.inert = true;
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = windowRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", handleKey);
-    const focusTimer = window.setTimeout(() => closeRef.current?.focus(), 30);
+    const preferred = windowRef.current?.querySelector<HTMLElement>("[data-autofocus]");
+    (preferred ?? closeRef.current)?.focus();
     return () => {
       document.body.style.overflow = prevOverflow;
+      if (room) room.inert = roomWasInert;
       document.removeEventListener("keydown", handleKey);
-      window.clearTimeout(focusTimer);
     };
   }, [onClose]);
 
   return (
-    <div className={styles.root} role="dialog" aria-modal="true" aria-label={title}>
+    <div className={styles.root} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className={styles.backdrop} onClick={onClose} aria-hidden />
-      <div className={styles.window}>
+      <div ref={windowRef} className={`${styles.window} ${wide ? styles.windowWide : ""}`}>
         <div className={styles.titlebar}>
-          <div className={styles.title}>{title}</div>
+          <div id={titleId} className={styles.title}>{title}</div>
           <button
             ref={closeRef}
             type="button"
@@ -137,6 +163,7 @@ type NotebookModalProps = {
 };
 
 function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
+  const { runCommand } = useWorkspace();
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -145,13 +172,8 @@ function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
   const doneCount = workspace.requirements.filter((r) => r.checked).length;
   const pendingReq = workspace.pending.requirements[0];
 
-  useEffect(() => {
-    textareaRef.current?.focus();
-    return () => {
-      if (toastTimerRef.current !== null) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-    };
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
   }, []);
 
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -171,7 +193,7 @@ function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
         <div className={styles.reqInline}>
           {workspace.requirements.map((req) => (
             <span key={req.id} className={styles.reqInlineItem}>
-              <span className={styles.reqBoxSmall} />
+              <span className={styles.reqBoxSmall} aria-hidden>{req.checked ? "✓" : ""}</span>
               {req.text}
             </span>
           ))}
@@ -181,8 +203,27 @@ function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
             <div className={styles.reqPendingLabel}>PIP SUGGESTS</div>
             {pendingReq.text}
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button type="button" className={styles.btn}>✓ Add to list</button>
-              <button type="button" className={`${styles.btn} ${styles.secondary}`}>✗ Skip</button>
+              <button
+                type="button"
+                className={styles.btn}
+                onClick={() => runCommand({
+                  type: "accept-requirement",
+                  suggestionId: pendingReq.suggestionId,
+                  requirementId: `requirement-${crypto.randomUUID()}`,
+                })}
+              >
+                ✓ Add to list
+              </button>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.secondary}`}
+                onClick={() => runCommand({
+                  type: "dismiss-requirement",
+                  suggestionId: pendingReq.suggestionId,
+                })}
+              >
+                ✗ Skip
+              </button>
             </div>
           </div>
         )}
@@ -205,6 +246,7 @@ function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
       <div className={styles.nbPage}>
         <textarea
           ref={textareaRef}
+          data-autofocus
           className={styles.nbTextarea}
           value={text}
           onChange={handleChange}
@@ -212,57 +254,73 @@ function NotebookModal({ text, onChange, workspace }: NotebookModalProps) {
         />
       </div>
       <div className={styles.note}>
-        <b>Working preview.</b> Text is stored in this browser (localStorage) so
-        you can leave and come back. When the real state layer lands it will save
-        to the workspace instead.
+        Text is saved with this workspace in your browser, so you can leave and
+        come back without losing the draft.
       </div>
     </>
   );
 }
 
-// ---------------- Board (stub with representative content) ----------------
+// ---------------- Board ----------------
 
-function BoardModal({ workspace }: { workspace: WorkspaceState }) {
-  const ideas = workspace.cards.filter((c) => c.kind === "idea").slice(0, 2);
-  const pending = workspace.pending.cards[0];
-  return (
-    <>
-      <div className={styles.boardPreview}>
-        {ideas[0] && (
-          <div className={`${styles.bigCard} ${styles.bc1}`}>
-            <span className={styles.bcKind}>IDEA</span>
-            <div>{ideas[0].text}</div>
-          </div>
-        )}
-        {ideas[0] && ideas[1] && <div className={styles.bcArrow} aria-hidden />}
-        {ideas[1] && (
-          <div className={`${styles.bigCard} ${styles.bc2}`}>
-            <span className={styles.bcKind}>IDEA</span>
-            <div>{ideas[1].text}</div>
-          </div>
-        )}
-        {pending && (
-          <div className={`${styles.bigCard} ${styles.bc3} ${styles.pending}`}>
-            <span className={styles.bcKind}>PIP · IDEA</span>
-            <div>{pending.text}</div>
-          </div>
-        )}
-      </div>
-      <div className={styles.note}>
-        <b>Preview.</b> The real board is Chris&apos;s React Flow — drag, connect,
-        move to aside pile. It wires in on top of this shell.
-      </div>
-    </>
-  );
+function BoardModal() {
+  return <IdeaBoard embedded />;
 }
 
-// ---------------- Mic (stub) ----------------
+// ---------------- Mic ----------------
 
 function MicModal({ workspace, pipLine }: { workspace: WorkspaceState; pipLine: string }) {
+  const { runCommand } = useWorkspace();
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState("");
+  const [sending, setSending] = useState(false);
+  const hasPipTurn = workspace.conversation.some(({ role }) => role === "pip");
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const userText = text.trim();
+    if (!userText || sending) return;
+
+    setSending(true);
+    setStatus("Pip is thinking…");
+    try {
+      const response = await fetch("/api/pip/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId: `pip-${crypto.randomUUID()}`,
+          revision: workspace.revision,
+          workspace,
+          userText,
+        }),
+      });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof body === "object" && body !== null && "error" in body &&
+          typeof body.error === "object" && body.error !== null && "message" in body.error &&
+          typeof body.error.message === "string"
+            ? body.error.message
+            : "Pip could not answer right now. Try again.";
+        throw new Error(message);
+      }
+
+      const parsed = pipTurnResponseSchema.safeParse(body);
+      if (!parsed.success) throw new Error("Pip returned an answer the board could not read.");
+      runCommand({ type: "apply-pip-turn", userText, response: parsed.data });
+      setText("");
+      setStatus("Pip added a reply to the conversation.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Pip could not answer right now.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <>
       <div className={styles.micConsole}>
-        <div className={styles.micLeft}>
+        <form className={styles.micLeft} onSubmit={handleSubmit}>
           <div className={styles.bigRec} aria-hidden>REC</div>
           <div
             style={{
@@ -273,15 +331,22 @@ function MicModal({ workspace, pipLine }: { workspace: WorkspaceState; pipLine: 
           >
             HOLD TO TALK
           </div>
-          <div style={{ fontSize: 11, opacity: 0.75, textAlign: "center" }}>
-            or type below
-          </div>
+          <label htmlFor="pip-message" className={styles.micInputLabel}>Type an idea</label>
           <input
+            id="pip-message"
             className={styles.micInput}
             type="text"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            maxLength={2000}
             placeholder="Type your idea and hit enter…"
+            disabled={sending}
           />
-        </div>
+          <button type="submit" className={styles.btn} disabled={sending || !text.trim()}>
+            {sending ? "Sending…" : "Ask Pip"}
+          </button>
+          <p className={styles.micStatus} role="status" aria-live="polite">{status}</p>
+        </form>
         <div className={styles.micRight} aria-label="Conversation">
           {workspace.conversation.map((turn, i) => (
             <div
@@ -294,7 +359,7 @@ function MicModal({ workspace, pipLine }: { workspace: WorkspaceState; pipLine: 
               {turn.text}
             </div>
           ))}
-          {pipLine && (
+          {!hasPipTurn && pipLine && (
             <div className={`${styles.chatTurn} ${styles.pip}`}>
               <div className={styles.chatWho}>PIP</div>
               {pipLine}
@@ -303,8 +368,8 @@ function MicModal({ workspace, pipLine }: { workspace: WorkspaceState; pipLine: 
         </div>
       </div>
       <div className={styles.note}>
-        <b>Preview.</b> Voice uses the Web Speech API (wired later). Text input
-        is here for the demo fallback.
+        <b>Demo fallback.</b> Type an idea when voice is unavailable. Your message
+        and Pip&apos;s reply are saved with the workspace.
       </div>
     </>
   );
@@ -323,85 +388,91 @@ function PipModal() {
           <div className={styles.pipOptionRow}>
             <div className={styles.pipOptionLabel}>BOW</div>
             <div className={styles.swatches}>
-              <button type="button" className={`${styles.swatch} ${styles.chosen}`}>None</button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--pinky)" }}>Pink</button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--sky)" }}>Sky</button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--mint)" }}>Mint</button>
+              <span className={`${styles.swatch} ${styles.chosen}`}>None</span>
+              <span className={styles.swatch} style={{ background: "var(--pinky)" }}>Pink</span>
+              <span className={styles.swatch} style={{ background: "var(--sky)" }}>Sky</span>
+              <span className={styles.swatch} style={{ background: "var(--mint)" }}>Mint</span>
             </div>
           </div>
           <div className={styles.pipOptionRow}>
             <div className={styles.pipOptionLabel}>HAT</div>
             <div className={styles.swatches}>
-              <button type="button" className={`${styles.swatch} ${styles.chosen}`}>None</button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--lilac)" }}>Wiz</button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--sun)" }}>Cap</button>
+              <span className={`${styles.swatch} ${styles.chosen}`}>None</span>
+              <span className={styles.swatch} style={{ background: "var(--lilac)" }}>Wiz</span>
+              <span className={styles.swatch} style={{ background: "var(--sun)" }}>Cap</span>
             </div>
           </div>
           <div className={styles.pipOptionRow}>
             <div className={styles.pipOptionLabel}>MOOD (reserved)</div>
             <div className={styles.swatches}>
-              <button type="button" className={`${styles.swatch} ${styles.chosen}`}>Cozy</button>
-              <button
-                type="button"
-                className={styles.swatch}
-                style={{ background: "var(--tomato)", color: "var(--paper)" }}
-              >
+              <span className={`${styles.swatch} ${styles.chosen}`}>Cozy</span>
+              <span className={styles.swatch} style={{ background: "var(--tomato)", color: "var(--paper)" }}>
                 Hype
-              </button>
-              <button type="button" className={styles.swatch} style={{ background: "var(--mint)" }}>Chill</button>
+              </span>
+              <span className={styles.swatch} style={{ background: "var(--mint)" }}>Chill</span>
             </div>
           </div>
         </div>
       </div>
       <div className={styles.note}>
-        <b>Preview.</b> Real accessory sprites and Pip&apos;s animations come after
-        MVP. Selections don&apos;t persist yet.
+        <b>Coming after the MVP.</b> These swatches preview the planned accessory
+        colors; customization is not interactive yet.
       </div>
     </>
   );
 }
 
-// ---------------- Shop (stub) ----------------
+// ---------------- Shop ----------------
 
 type ShopItem = {
-  id: string;
-  name: string;
-  cost: number;
+  id: DecorationId;
   thumb: React.ReactNode;
 };
 
 const SHOP_ITEMS: ShopItem[] = [
-  { id: "rug", name: "Rug", cost: 5, thumb: <div className="item" style={{ width: 44, height: 14, background: "var(--tomato)" }} /> },
-  { id: "plant", name: "Plant", cost: 3, thumb: <div className="item" style={{ width: 22, height: 38, background: "var(--mint)", borderRadius: "50% 50% 4px 4px" }} /> },
-  { id: "lamp", name: "Lamp", cost: 4, thumb: <div className="item" style={{ width: 24, height: 44, background: "var(--sun)" }} /> },
-  { id: "poster", name: "Poster", cost: 2, thumb: <div className="item" style={{ width: 44, height: 30, background: "var(--lilac)" }} /> },
-  { id: "rainbow-rug", name: "Rainbow rug", cost: 10, thumb: <div className="item" style={{ width: 40, height: 40, background: "repeating-linear-gradient(45deg,var(--pinky) 0 6px, var(--paper) 6px 12px)" }} /> },
-  { id: "fish-bowl", name: "Fish bowl", cost: 6, thumb: <div className="item" style={{ width: 34, height: 34, background: "var(--sky)", borderRadius: "50%" }} /> },
+  { id: "rug", thumb: <div className="item" style={{ width: 44, height: 14, background: "var(--tomato)" }} /> },
+  { id: "plant", thumb: <div className="item" style={{ width: 22, height: 38, background: "var(--mint)", borderRadius: "50% 50% 4px 4px" }} /> },
+  { id: "lamp", thumb: <div className="item" style={{ width: 24, height: 44, background: "var(--sun)" }} /> },
+  { id: "poster", thumb: <div className="item" style={{ width: 44, height: 30, background: "var(--lilac)" }} /> },
+  { id: "rainbow-rug", thumb: <div className="item" style={{ width: 40, height: 40, background: "repeating-linear-gradient(45deg,var(--pinky) 0 6px, var(--paper) 6px 12px)" }} /> },
+  { id: "fish-bowl", thumb: <div className="item" style={{ width: 34, height: 34, background: "var(--sky)", borderRadius: "50%" }} /> },
 ];
 
-function ShopModal({ workspace }: { workspace: WorkspaceState }) {
+function ShopModal() {
+  const { workspace, runCommand } = useWorkspace();
+  const [status, setStatus] = useState("");
+
   return (
     <>
       <div className={styles.shopGrid}>
         {SHOP_ITEMS.map((item) => {
-          const affordable = workspace.coins >= item.cost;
-          const needed = item.cost - workspace.coins;
+          const decoration = DECORATIONS[item.id];
+          const owned = workspace.ownedDecorations.includes(item.id);
+          const affordable = workspace.coins >= decoration.cost;
+          const needed = decoration.cost - workspace.coins;
           return (
             <div key={item.id} className={styles.shopTile}>
               <div className={styles.shopThumb}>{item.thumb}</div>
-              <div className={styles.shopName}>{item.name}</div>
-              <div className={styles.shopCost}>{item.cost} coins</div>
-              <button className={styles.shopBuy} disabled={!affordable}>
-                {affordable ? "Buy" : `Need ${needed} more`}
+              <div className={styles.shopName}>{decoration.name}</div>
+              <div className={styles.shopCost}>{decoration.cost} coins</div>
+              <button
+                type="button"
+                className={styles.shopBuy}
+                disabled={owned || !affordable}
+                onClick={() => {
+                  runCommand({ type: "buy-decoration", decorationId: item.id });
+                  setStatus(`${decoration.name} added to your collection.`);
+                }}
+              >
+                {owned ? "Owned" : affordable ? "Buy" : `Need ${needed} more`}
               </button>
             </div>
           );
         })}
       </div>
+      <p className={styles.shopStatus} role="status" aria-live="polite">{status}</p>
       <div className={styles.note}>
-        <b>Preview.</b> Buying will pull from <code>coins</code>, push the item
-        into <code>ownedDecorations</code>, and drop the object into the room
-        hub.
+        Purchases use your earned coins and are saved with this workspace.
       </div>
     </>
   );

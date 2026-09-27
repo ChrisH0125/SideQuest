@@ -13,6 +13,11 @@ export const PAID_IDEAS_PER_PROJECT = 5;
 
 export const DECORATIONS = {
   rug: { name: "Rug", cost: 5 },
+  plant: { name: "Plant", cost: 3 },
+  lamp: { name: "Lamp", cost: 4 },
+  poster: { name: "Poster", cost: 2 },
+  "rainbow-rug": { name: "Rainbow rug", cost: 10 },
+  "fish-bowl": { name: "Fish bowl", cost: 6 },
 } as const;
 export type DecorationId = keyof typeof DECORATIONS;
 

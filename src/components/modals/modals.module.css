@@ -31,6 +31,10 @@
   flex-direction: column;
   color: var(--ink);
 }
+.windowWide {
+  width: min(1120px, 100%);
+  max-height: 90vh;
+}
 .titlebar {
   display: flex;
   align-items: center;
@@ -82,6 +86,11 @@
   cursor: pointer;
 }
 .btn.secondary { background: var(--pinky); }
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
 .note {
   padding: 10px 12px;
   border: 3px dashed var(--ink);
@@ -246,6 +255,17 @@
   color: var(--ink);
   font-size: 13px;
 }
+.micInputLabel {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.micStatus {
+  min-height: 2.5em;
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+}
 .micRight {
   flex: 1; min-width: 260px;
   border: 3px dashed var(--ink);
@@ -293,7 +313,7 @@
   font-family: var(--font-display);
   font-size: 10px; letter-spacing: 1px;
   display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  cursor: default;
 }
 .swatch.chosen { outline: 3px dashed var(--tomato); outline-offset: 3px; }
 
@@ -334,6 +354,13 @@
   color: var(--muted);
   cursor: not-allowed;
   box-shadow: none;
+}
+.shopStatus {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
 }
 
 /* --- clipboard modal --- */
@@ -395,4 +422,22 @@
   width: 12px; height: 12px;
   border: 2px solid var(--ink);
   background: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+@media (max-width: 520px) {
+  .root { padding: 8px; }
+  .window, .windowWide { max-height: 94vh; }
+  .title { font-size: 14px; letter-spacing: 1px; }
+  .body { padding: 12px; }
+  .nbPage { padding: 16px 14px 16px 34px; }
+  .nbPage::before { left: 24px; }
+  .micLeft, .micRight, .pipFrame, .pipOptions {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .shopGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

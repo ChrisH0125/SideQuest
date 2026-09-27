@@ -34,7 +34,7 @@ export function RoomScene({
   const reqPct = totalReqs === 0 ? 0 : Math.round((doneReqs / totalReqs) * 100);
 
   return (
-    <div className={styles.app}>
+    <div id="room-scene" className={styles.app}>
       <header className={styles.topbar}>
         <div className={styles.topbarLeft}>
           <span
