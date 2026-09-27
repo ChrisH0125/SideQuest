@@ -11,14 +11,13 @@ const BASE = 148;
 export function Pip({ size, className }: PipProps) {
   const scale = size ? size / BASE : 1;
   const style = size
-    ? { transform: `scale(${scale})`, transformOrigin: "center center" }
+    ? { transform: `scale(${scale})`, transformOrigin: "top left" }
     : undefined;
-  return (
+  const sprite = (
     <div
       className={`cat${className ? ` ${className}` : ""}`}
       role="img"
       aria-label="Pip, an orange pixel cat"
-      style={style}
     >
       <div className="cat-tail" />
       <div className="cat-body">
@@ -39,4 +38,5 @@ export function Pip({ size, className }: PipProps) {
       </div>
     </div>
   );
+  return size ? <div style={{ width: size, height: size * 150 / BASE }}><div style={style}>{sprite}</div></div> : sprite;
 }

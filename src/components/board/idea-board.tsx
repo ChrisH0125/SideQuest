@@ -1,354 +1,153 @@
 "use client";
 
-import {
-  Background,
-  Controls,
-  MarkerType,
-  ReactFlow,
-  useNodesState,
-  type Connection as FlowConnection,
-  type Edge,
-  type Node,
-  type NodeMouseHandler,
-  type ReactFlowInstance,
-} from "@xyflow/react";
+import { Background, Controls, MarkerType, ReactFlow, useNodesState, type Node, type ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Card, WorkspaceState } from "@/lib/contracts";
-import type { WorkspaceCommand } from "@/lib/workspace-reducer";
 import { useWorkspace } from "./workspace-provider";
+import styles from "./workspace.module.css";
 
 type CardNode = Node<{ label: string }>;
-
-function cardNodes(workspace: WorkspaceState): CardNode[] {
-  const selected = new Set(workspace.selectedCardIds);
-  return workspace.cards.map((card) => ({
-    id: card.id,
-    position: card.position,
-    data: { label: card.text },
-    selected: selected.has(card.id),
-    className: card.status === "aside" ? "opacity-55" : "",
+function nodesFor(workspace: WorkspaceState): CardNode[] {
+  return workspace.cards.map(card => ({
+    id: card.id, position: card.position, data: { label: card.text },
+    selected: workspace.selectedCardIds.includes(card.id),
+    className: card.status === "aside" ? styles.asideCard : "",
     ariaLabel: `${card.kind === "step" ? "Next step" : "Idea"}: ${card.text}`,
   }));
 }
-
-function cardEdges(workspace: WorkspaceState): Edge[] {
-  return workspace.connections.map((connection) => ({
-    id: connection.id,
-    source: connection.fromCardId,
-    target: connection.toCardId,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: "#6d5a94", strokeWidth: 2 },
-  }));
+export function nextCardPosition(count: number) {
+  return { x: (count % 3) * 260, y: Math.floor(count / 3) * 160 };
 }
 
-function nextCardPosition(cardCount: number): Card["position"] {
-  return {
-    x: 40 + (cardCount % 3) * 220,
-    y: 40 + Math.floor(cardCount / 3) * 140,
-  };
-}
-
-function cardsAreConnected(workspace: WorkspaceState, fromCardId: string, toCardId: string) {
-  return workspace.connections.some(
-    (connection) =>
-      (connection.fromCardId === fromCardId && connection.toCardId === toCardId) ||
-      (connection.fromCardId === toCardId && connection.toCardId === fromCardId),
-  );
-}
-
-function SelectedCardEditor({
-  card,
-  runCommand,
-  onStatus,
-}: {
-  card: Card;
-  runCommand: (command: WorkspaceCommand) => void;
-  onStatus: (message: string) => void;
-}) {
-  const [editText, setEditText] = useState(card.text);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+function CardEditor({ card }: { card: Card }) {
+  const { runCommand } = useWorkspace();
+  const [text, setText] = useState(card.text);
+  const [status, setStatus] = useState("");
+  return <form className={styles.cardEditor} onSubmit={event => {
     event.preventDefault();
-    runCommand({ type: "edit-card", cardId: card.id, text: editText });
-    onStatus("Card updated.");
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="rounded-xl border-2 border-[#3d3452] bg-[#fffdf7] p-4">
-      <h2 className="text-lg font-black">Selected card</h2>
-      <label htmlFor="edit-card" className="mt-3 block text-sm font-bold">Card text</label>
-      <textarea
-        id="edit-card"
-        value={editText}
-        onChange={(event) => setEditText(event.target.value)}
-        maxLength={500}
-        rows={3}
-        className="mt-1 w-full resize-y rounded-lg border-2 border-[#8f82a5] bg-white p-2 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#765f9d]"
-      />
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="submit" className="rounded-lg bg-[#6d5a94] px-3 py-2 text-sm font-bold text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452]">
-          Save edit
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            runCommand({ type: "move-aside", cardId: card.id });
-            onStatus("Card moved to explore later.");
-          }}
-          disabled={card.status === "aside"}
-          className="rounded-lg border-2 border-[#6d5a94] px-3 py-2 text-sm font-bold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452] disabled:opacity-45"
-        >
-          Move aside
-        </button>
-      </div>
-    </form>
-  );
+    const result = runCommand({ type: "edit-card", cardId: card.id, text });
+    setStatus(result.ok ? "Card updated." : result.reason);
+  }}>
+    <label htmlFor="edit-card">Selected idea</label>
+    <textarea id="edit-card" value={text} onChange={event => setText(event.target.value)} maxLength={500} rows={2} required />
+    <div className={styles.actions}>
+      <button type="submit">Save edit</button>
+      <button type="button" disabled={card.status === "aside"} onClick={() => {
+        const result = runCommand({ type: "move-aside", cardId: card.id });
+        setStatus(result.ok ? "Moved aside." : result.reason);
+      }}>Move aside</button>
+      <button type="button" onClick={() => runCommand({ type: "select-cards", cardIds: [] })}>Deselect</button>
+    </div>
+    {status && <p role="status">{status}</p>}
+  </form>;
 }
 
 export function IdeaBoard({ embedded = false }: { embedded?: boolean }) {
   const { workspace, canUndo, runCommand, undo } = useWorkspace();
-  const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(cardNodes(workspace));
-  const flowRef = useRef<ReactFlowInstance<CardNode> | null>(null);
-  const previousCardCountRef = useRef(workspace.cards.length);
-  const [newCardText, setNewCardText] = useState("");
-  const [connectFrom, setConnectFrom] = useState(workspace.cards[0]?.id ?? "");
-  const [connectTo, setConnectTo] = useState(workspace.cards[1]?.id ?? "");
-  const [statusMessage, setStatusMessage] = useState("Board ready.");
-
-  const edges = useMemo(() => cardEdges(workspace), [workspace]);
-  const selectedCard = workspace.cards.find(({ id }) => workspace.selectedCardIds[0] === id);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(nodesFor(workspace));
+  const flow = useRef<ReactFlowInstance<CardNode> | null>(null);
+  const canvas = useRef<HTMLDivElement>(null);
+  const count = useRef(workspace.cards.length);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState("");
+  const addInput = useRef<HTMLTextAreaElement>(null);
+  const selected = workspace.cards.find(card => card.id === workspace.selectedCardIds[0]);
+  const edges = useMemo(() => workspace.connections.map(connection => ({
+    id: connection.id, source: connection.fromCardId, target: connection.toCardId,
+    markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: "#79628c", strokeWidth: 2 },
+  })), [workspace.connections]);
 
   useEffect(() => {
-    setNodes(cardNodes(workspace));
-    if (workspace.cards.length !== previousCardCountRef.current) {
-      previousCardCountRef.current = workspace.cards.length;
-      requestAnimationFrame(() => flowRef.current?.fitView({ padding: 0.2 }));
-    }
-  }, [setNodes, workspace]);
-
-  const handleNodeClick: NodeMouseHandler<CardNode> = (_, node) => {
-    runCommand({ type: "select-cards", cardIds: [node.id] });
-    setStatusMessage("Card selected.");
-  };
-
-  const handleConnect = (connection: FlowConnection) => {
-    if (!connection.source || !connection.target) return;
-    if (cardsAreConnected(workspace, connection.source, connection.target)) {
-      setStatusMessage("Those cards are already connected.");
-      return;
-    }
-    runCommand({
-      type: "connect",
-      connectionId: `connection-${crypto.randomUUID()}`,
-      fromCardId: connection.source,
-      toCardId: connection.target,
+    if (!canvas.current) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => flow.current?.fitView({ padding: 0.18, maxZoom: 1.1 }));
     });
-    setStatusMessage("Cards connected.");
-  };
+    observer.observe(canvas.current);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, []);
 
-  const handleAddCard = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    setNodes(nodesFor(workspace));
+    if (count.current !== workspace.cards.length) {
+      count.current = workspace.cards.length;
+      requestAnimationFrame(() => flow.current?.fitView({ padding: 0.3, maxZoom: 1.1 }));
+    }
+  }, [workspace.cards, workspace.selectedCardIds, setNodes, workspace]);
+
+  function addCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const text = newCardText.trim();
-    if (!text) {
-      setStatusMessage("Write an idea before adding a card.");
-      return;
-    }
-    const id = `card-${crypto.randomUUID()}`;
-    runCommand({
-      type: "add-card",
-      card: {
-        id,
-        text,
-        kind: "idea",
-        position: nextCardPosition(workspace.cards.length),
-        status: "active",
-      },
-    });
-    setNewCardText("");
-    setStatusMessage("Idea added to the board.");
-  };
+    const result = runCommand({ type: "add-card", card: {
+      id: crypto.randomUUID(), text, kind: "idea", status: "active", position: nextCardPosition(workspace.cards.length),
+    } });
+    setStatus(result.ok ? "Idea added." : result.reason);
+    if (result.ok) { setText(""); setToolsOpen(false); }
+  }
 
-  const connectCards = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!connectFrom || !connectTo || connectFrom === connectTo) {
-      setStatusMessage("Choose two different cards to connect.");
-      return;
-    }
-    if (cardsAreConnected(workspace, connectFrom, connectTo)) {
-      setStatusMessage("Those cards are already connected.");
-      return;
-    }
-    runCommand({
-      type: "connect",
-      connectionId: `connection-${crypto.randomUUID()}`,
-      fromCardId: connectFrom,
-      toCardId: connectTo,
-    });
-    setStatusMessage("Cards connected.");
-  };
-
-  return (
-    <main className={embedded ? "text-[#2f2940]" : "min-h-screen bg-[#f6f0df] px-4 py-6 text-[#2f2940] sm:px-6 lg:px-8"}>
-      <div className={embedded ? "" : "mx-auto max-w-7xl"}>
-        {!embedded && <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#765f9d]">SideQuest workspace</p>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Untangle your ideas</h1>
-            <p className="mt-1 max-w-2xl text-sm text-[#5c536b]">
-              Drag ideas into place, connect related thoughts, and set aside anything you want to revisit later.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              undo();
-              setStatusMessage("Last board change undone.");
-            }}
-            disabled={!canUndo}
-            className="rounded-lg border-2 border-[#3d3452] bg-white px-4 py-2 font-bold shadow-[3px_3px_0_#3d3452] transition-transform hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#765f9d] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
-          >
-            Undo last change
-          </button>
-        </header>}
-
-        <div className={`grid gap-5 ${embedded ? "min-[900px]:grid-cols-[minmax(0,1fr)_18rem]" : "lg:grid-cols-[minmax(0,1fr)_20rem]"}`}>
-          <section aria-labelledby="board-heading" className="overflow-hidden rounded-xl border-2 border-[#3d3452] bg-[#fffdf7] shadow-[5px_5px_0_#3d3452]">
-            <h2 id="board-heading" className="border-b-2 border-[#3d3452] bg-[#e9ddfa] px-4 py-3 text-lg font-black">
-              Idea board
-            </h2>
-            <div className={`${embedded ? "h-[28rem] min-h-[22rem]" : "h-[34rem] min-h-[28rem]"} w-full`} aria-label="Interactive idea board">
-              <ReactFlow<CardNode>
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onInit={(instance) => {
-                  flowRef.current = instance;
-                }}
-                onNodeClick={handleNodeClick}
-                onNodeDragStop={(_, node) =>
-                  runCommand({ type: "move-card", cardId: node.id, position: node.position })
-                }
-                onConnect={handleConnect}
-                fitView
-                minZoom={0.45}
-                maxZoom={1.6}
-                nodesFocusable
-                edgesFocusable
-              >
-                <Background color="#c9bdd8" gap={24} />
-                <Controls showInteractive={false} />
-              </ReactFlow>
-            </div>
-          </section>
-
-          <aside aria-label="Board tools" className="space-y-4">
-            <form onSubmit={handleAddCard} className="rounded-xl border-2 border-[#3d3452] bg-[#fffdf7] p-4">
-              <h2 className="text-lg font-black">Add an idea</h2>
-              <label htmlFor="new-card" className="mt-3 block text-sm font-bold">Idea text</label>
-              <textarea
-                id="new-card"
-                value={newCardText}
-                onChange={(event) => setNewCardText(event.target.value)}
-                maxLength={500}
-                rows={3}
-                className="mt-1 w-full resize-y rounded-lg border-2 border-[#8f82a5] bg-white p-2 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#765f9d]"
-              />
-              <button type="submit" className="mt-3 w-full rounded-lg bg-[#6d5a94] px-3 py-2 font-bold text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452]">
-                Add card
-              </button>
-            </form>
-
-            <section aria-labelledby="ideas-list-heading" className="rounded-xl border-2 border-[#3d3452] bg-[#fffdf7] p-4">
-              <h2 id="ideas-list-heading" className="text-lg font-black">All cards</h2>
-              <p className="mt-1 text-xs text-[#685e75]">This list offers the same selection controls without dragging.</p>
-              <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
-                {workspace.cards.map((card) => (
-                  <li key={card.id}>
-                    <button
-                      type="button"
-                      onClick={() => runCommand({ type: "select-cards", cardIds: [card.id] })}
-                      aria-pressed={workspace.selectedCardIds.includes(card.id)}
-                      className="w-full rounded-lg border-2 border-[#b5a8c7] px-3 py-2 text-left text-sm hover:bg-[#f1eafd] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#765f9d] aria-pressed:border-[#6d5a94] aria-pressed:bg-[#e9ddfa]"
-                    >
-                      <span className="block font-bold">{card.text}</span>
-                      <span className="text-xs capitalize text-[#685e75]">{card.status}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            {workspace.pending.cards.length > 0 && (
-              <section aria-labelledby="pip-suggestions-heading" className="rounded-xl border-2 border-dashed border-[#6d5a94] bg-[#f1eafd] p-4">
-                <h2 id="pip-suggestions-heading" className="text-lg font-black">Pip suggests</h2>
-                <ul className="mt-3 space-y-3">
-                  {workspace.pending.cards.map((suggestion) => (
-                    <li key={suggestion.suggestionId} className="rounded-lg border-2 border-[#b5a8c7] bg-white p-3">
-                      <p className="text-sm font-bold">{suggestion.text}</p>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          className="rounded-lg bg-[#6d5a94] px-3 py-2 text-sm font-bold text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452]"
-                          onClick={() => {
-                            runCommand({
-                              type: "accept-card",
-                              suggestionId: suggestion.suggestionId,
-                              cardId: `card-${suggestion.suggestionId}`.slice(0, 64),
-                              position: nextCardPosition(workspace.cards.length),
-                            });
-                            setStatusMessage("Pip's idea was added to the board.");
-                          }}
-                        >
-                          Add
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-lg border-2 border-[#6d5a94] px-3 py-2 text-sm font-bold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452]"
-                          onClick={() => {
-                            runCommand({ type: "dismiss-card", suggestionId: suggestion.suggestionId });
-                            setStatusMessage("Suggestion dismissed.");
-                          }}
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {selectedCard ? (
-              <SelectedCardEditor
-                key={selectedCard.id}
-                card={selectedCard}
-                runCommand={runCommand}
-                onStatus={setStatusMessage}
-              />
-            ) : null}
-
-            <form onSubmit={connectCards} className="rounded-xl border-2 border-[#3d3452] bg-[#fffdf7] p-4">
-              <h2 className="text-lg font-black">Connect two cards</h2>
-              <label htmlFor="connect-from" className="mt-3 block text-sm font-bold">From</label>
-              <select id="connect-from" value={connectFrom} onChange={(event) => setConnectFrom(event.target.value)} className="mt-1 w-full rounded-lg border-2 border-[#8f82a5] bg-white p-2">
-                {workspace.cards.map((card) => <option key={card.id} value={card.id}>{card.text}</option>)}
-              </select>
-              <label htmlFor="connect-to" className="mt-3 block text-sm font-bold">To</label>
-              <select id="connect-to" value={connectTo} onChange={(event) => setConnectTo(event.target.value)} className="mt-1 w-full rounded-lg border-2 border-[#8f82a5] bg-white p-2">
-                {workspace.cards.map((card) => <option key={card.id} value={card.id}>{card.text}</option>)}
-              </select>
-              <button type="submit" className="mt-3 w-full rounded-lg border-2 border-[#6d5a94] px-3 py-2 font-bold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#3d3452]">
-                Connect cards
-              </button>
-            </form>
-
-            <p role="status" aria-live="polite" aria-atomic="true" className="rounded-lg bg-[#3d3452] px-3 py-2 text-sm text-white">
-              {statusMessage}
-            </p>
-          </aside>
-        </div>
+  return <section className={styles.board} aria-label="Idea board" data-embedded={embedded}>
+    <div className={styles.boardToolbar}>
+      <div><h1 className={styles.boardTitle}>A little room for your ideas.</h1><p>Start with one thought. We’ll find the next step together.</p></div>
+      <div className={styles.actions}>
+        <button type="button" onClick={() => { setToolsOpen(true); requestAnimationFrame(() => addInput.current?.focus()); }}>+ Add idea</button>
+        <button type="button" aria-expanded={toolsOpen} aria-controls="board-tools" onClick={() => setToolsOpen(value => !value)}>Tools</button>
+        <button type="button" disabled={!canUndo} onClick={() => { undo(); setStatus("Last board change undone."); }}>Undo</button>
       </div>
-    </main>
-  );
+    </div>
+    <div className={styles.boardBody}>
+      <div ref={canvas} className={styles.canvas} aria-label="Interactive idea board">
+        <ReactFlow<CardNode>
+          nodes={nodes} edges={edges} onNodesChange={onNodesChange}
+          onInit={instance => { flow.current = instance; }}
+          onNodeClick={(_, node) => runCommand({ type: "select-cards", cardIds: [node.id] })}
+          onPaneClick={() => runCommand({ type: "select-cards", cardIds: [] })}
+          onNodeDragStop={(_, node) => runCommand({ type: "move-card", cardId: node.id, position: node.position })}
+          onConnect={connection => {
+            const result = runCommand({ type: "connect", connectionId: crypto.randomUUID(), fromCardId: connection.source, toCardId: connection.target });
+            setStatus(result.ok ? "Ideas connected." : result.reason);
+          }}
+          fitView fitViewOptions={{ padding: 0.4, maxZoom: 1.1 }}
+          minZoom={0.3} maxZoom={1.8} deleteKeyCode={null}
+          nodesFocusable edgesFocusable
+        >
+          <Background color="#bdae96" gap={24} size={1} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+        {workspace.cards.length === 0 && <p className={styles.empty}>Add a thought, or tell Pip what you’re working on.</p>}
+      </div>
+      {toolsOpen && <aside id="board-tools" className={styles.tools} aria-label="Board tools">
+        <div className={styles.actions}><h2>Board tools</h2><button type="button" onClick={() => setToolsOpen(false)}>Close tools</button></div>
+        <form onSubmit={addCard}>
+          <label htmlFor="new-card">Your idea</label>
+          <textarea ref={addInput} id="new-card" value={text} onChange={event => setText(event.target.value)} rows={3} maxLength={500} required />
+          <button type="submit">Add card</button>
+        </form>
+        <details>
+          <summary>All cards · {workspace.cards.length}</summary>
+          <ul className={styles.cardList}>{workspace.cards.map(card => <li key={card.id}>
+            <button type="button" aria-pressed={workspace.selectedCardIds.includes(card.id)} onClick={() => runCommand({ type: "select-cards", cardIds: [card.id] })}>{card.text} {card.status === "aside" ? " · aside" : ""}</button>
+          </li>)}</ul>
+        </details>
+        <details>
+          <summary>Connect ideas without dragging</summary>
+          <form onSubmit={event => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const result = runCommand({ type: "connect", connectionId: crypto.randomUUID(), fromCardId: String(data.get("from")), toCardId: String(data.get("to")) });
+            setStatus(result.ok ? "Ideas connected." : result.reason);
+          }}>
+            <label htmlFor="connect-from">From</label>
+            <select id="connect-from" name="from">{workspace.cards.map(card => <option key={card.id} value={card.id}>{card.text}</option>)}</select>
+            <label htmlFor="connect-to">To</label>
+            <select id="connect-to" name="to" defaultValue={workspace.cards[1]?.id}>{workspace.cards.map(card => <option key={card.id} value={card.id}>{card.text}</option>)}</select>
+            <button type="submit" disabled={workspace.cards.length < 2}>Connect cards</button>
+          </form>
+        </details>
+      </aside>}
+    </div>
+    {selected && <CardEditor key={selected.id + selected.text} card={selected} />}
+    <p className={styles.boardStatus} role="status">{status || "Drag to arrange · Use the dots to connect · Select a card to edit"}</p>
+  </section>;
 }

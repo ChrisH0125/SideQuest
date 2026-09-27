@@ -1,10 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { WorkspaceState } from "@/lib/contracts";
 import { Pip } from "@/components/pip/Pip";
 import type { ModalTarget } from "@/components/modals/ModalHost";
 import "./room-styles.css";
+import { ThemeToggle } from "./ThemeToggle";
 
 type OpenFn = (target: Exclude<ModalTarget, null>, opener: HTMLElement) => void;
 
@@ -13,6 +14,8 @@ type RoomSceneProps = {
   pipLine: string;
   notebookWordCount: number;
   onOpen: OpenFn;
+  night: boolean;
+  onToggleTheme: () => void;
 };
 
 export function RoomScene({
@@ -20,7 +23,17 @@ export function RoomScene({
   pipLine,
   notebookWordCount,
   onOpen,
+  night,
+  onToggleTheme,
 }: RoomSceneProps) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    if (!frame.current) return;
+    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 960));
+    observer.observe(frame.current);
+    return () => observer.disconnect();
+  }, []);
   const openFrom =
     (target: Exclude<ModalTarget, null>) =>
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -37,7 +50,8 @@ export function RoomScene({
 
   return (
     <main id="room-scene" className="app-stage">
-      <div className="game-shell">
+      <div className="hero-frame" ref={frame}>
+      <div className="game-shell" style={{ transform: `scale(${scale})` }}>
         <div className="top-strip">
           <div
             className="coin-chip"
@@ -50,6 +64,8 @@ export function RoomScene({
             <b>S</b>ideQuest
           </p>
           <div className="top-actions">
+            <button type="button" className="pixel-button tone-mint" onClick={openFrom("board")}>CANVAS</button>
+            <ThemeToggle night={night} onToggle={onToggleTheme} />
             <button
               type="button"
               aria-label="Open decoration shop"
@@ -135,7 +151,7 @@ export function RoomScene({
               type="button"
               className="object-hit pip-hit"
               onClick={openFrom("pip")}
-              aria-label="Open Pip customization"
+              aria-label="Talk with Pip"
             >
               <Pip />
               <HoverLabel>PIP</HoverLabel>
@@ -143,6 +159,12 @@ export function RoomScene({
           </div>
         </div>
       </div>
+      </div>
+      <nav className="room-mobile-actions" aria-label="Room shortcuts">
+        <button type="button" className="pixel-button tone-mint" onClick={openFrom("board")}>CANVAS</button>
+        <button type="button" className="pixel-button tone-cream" onClick={openFrom("notebook")}>NOTEBOOK</button>
+        <ThemeToggle night={night} onToggle={onToggleTheme} />
+      </nav>
     </main>
   );
 }
@@ -241,7 +263,7 @@ function Recorder({
         <div className="mic-grille"><i /><i /><i /></div>
         <span className="rec-dot" />
         <span className="rec-text">RECORDER</span>
-        <div className="recorder-label">HOLD TO TALK</div>
+        <div className="recorder-label">TALK TO PIP</div>
       </div>
       <div className="alert-badge">!</div>
       <HoverLabel>TAPE RECORDER</HoverLabel>

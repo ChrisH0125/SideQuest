@@ -1,7 +1,10 @@
 import type { Card, PipTurnResponse, ProposedAction, WorkspaceState } from "./contracts";
 import { buyDecoration, rewardIdeaAccepted, type DecorationId } from "./rewards";
+import { workspaceStateSchema, pipTurnResponseSchema } from "./schemas";
 
 export type WorkspaceCommand =
+  | { type: "update-assignment"; text: string }
+  | { type: "check-requirement"; requirementId: string; checked: boolean }
   | { type: "add-card"; card: Card }
   | { type: "edit-card"; cardId: string; text: string }
   | { type: "select-cards"; cardIds: string[] }
@@ -37,9 +40,13 @@ function unchanged(workspace: WorkspaceState, reason: string): CommandResult {
 }
 
 function accepted(workspace: WorkspaceState, changes: Partial<WorkspaceState>): CommandResult {
+  const candidate = { ...workspace, ...changes, revision: workspace.revision + 1 };
+  if (!workspaceStateSchema.safeParse(candidate).success) {
+    return unchanged(workspace, "This change exceeds a workspace limit or contains invalid data. Nothing changed.");
+  }
   return {
     ok: true,
-    workspace: { ...workspace, ...changes, revision: workspace.revision + 1 },
+    workspace: candidate,
   };
 }
 
@@ -50,6 +57,10 @@ export function applyWorkspaceCommand(
   const cardIds = new Set(workspace.cards.map(({ id }) => id));
 
   switch (command.type) {
+    case "update-assignment":
+      return accepted(workspace, { assignment: command.text });
+    case "check-requirement":
+      return accepted(workspace, { requirements: workspace.requirements.map((item) => item.id === command.requirementId ? { ...item, checked: command.checked } : item) });
     case "add-card": {
       const text = command.card.text.trim();
       if (!text || text.length > 500) return unchanged(workspace, "Card text must be 1–500 characters.");
@@ -181,10 +192,13 @@ export function applyWorkspaceCommand(
         ({ suggestionId }) => suggestionId === command.suggestionId,
       );
       if (!suggestion) return unchanged(workspace, "That card suggestion is no longer available.");
-      if (cardIds.has(command.cardId)) return unchanged(workspace, "That card already exists.");
+      // The full suggestion ID is already schema-bounded; never truncate it.
+      // Reaccepting after undo keeps the same reward identity.
+      const acceptedId = suggestion.suggestionId;
+      if (cardIds.has(acceptedId)) return unchanged(workspace, "That card already exists.");
 
       const card: Card = {
-        id: command.cardId,
+        id: acceptedId,
         text: suggestion.text,
         kind: suggestion.kind,
         position: command.position,
@@ -220,6 +234,9 @@ export function applyWorkspaceCommand(
       });
     }
     case "apply-pip-turn": {
+      if (!pipTurnResponseSchema.safeParse(command.response).success) {
+        return unchanged(workspace, "Pip returned invalid data. Nothing changed.");
+      }
       if (command.response.basedOnRevision !== workspace.revision) {
         return unchanged(workspace, "Pip answered an older version of the workspace.");
       }
@@ -292,6 +309,8 @@ export function workspaceHistoryReducer(
     return {
       workspace: {
         ...previous,
+        notebookText: state.workspace.notebookText,
+        conversation: state.workspace.conversation,
         coins: state.workspace.coins,
         rewardEventIds: state.workspace.rewardEventIds,
         ownedDecorations: state.workspace.ownedDecorations,
@@ -304,7 +323,7 @@ export function workspaceHistoryReducer(
   const result = applyWorkspaceCommand(state.workspace, action.command);
   if (!result.ok) return state;
 
-  if (action.command.type === "update-notebook" || action.command.type === "buy-decoration") {
+  if (action.command.type === "update-notebook" || action.command.type === "buy-decoration" || action.command.type === "select-cards") {
     return { ...state, workspace: result.workspace };
   }
 

@@ -1,0 +1,85 @@
+.shell { --canvas-bg: #fffbed; --canvas-card: #fffef8; --canvas-text: var(--ink); --canvas-line: #b6a2c2; color: var(--ink); color-scheme: light; min-height: 100dvh; font-family: var(--font-atkinson), system-ui, sans-serif; }
+.shell:global(.night-mode) { --canvas-bg: #30263f; --canvas-card: #463651; --canvas-text: #fffbed; --canvas-line: #9274aa; }
+.shell :is(button, input, textarea, select, summary):focus-visible { outline: 3px solid #b65b41; outline-offset: 4px; }
+.shell :is(input, textarea, select) { font: inherit; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); border-radius: 0; padding: 8px; width: 100%; min-width: 0; }
+.shell input[type="checkbox"] { width: auto; margin-right: 8px; }
+.shell label { font-size: 13px; font-weight: 700; }
+.canvasPage { height: 100dvh; overflow: hidden; background: var(--canvas-bg); color: var(--canvas-text); }
+.canvasHeader { height: 64px; display: flex; align-items: center; gap: 20px; padding: 10px 24px; background: var(--paper); color: var(--ink); border-bottom: 3px solid var(--ink); position: relative; z-index: 15; }
+.canvasHeader h1 { font: 700 24px/1 var(--font-pixelify), sans-serif; }
+.headerActions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.save { font-size: 11px; max-width: 240px; }
+.board { height: calc(100dvh - 64px); position: relative; }
+.boardToolbar { position: absolute; z-index: 8; left: 22px; top: 18px; display: flex; gap: 18px; align-items: center; }
+.boardTitle { font: 700 18px/1 var(--font-pixelify), sans-serif; }
+.boardToolbar > div:first-child { display: none; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.board button, .companion button { cursor: pointer; min-height: 40px; padding: 8px 12px; background: var(--paper); color: var(--ink); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); font: 700 14px/1.2 var(--font-pixelify), sans-serif; }
+.board button:hover:not(:disabled), .companion button:hover:not(:disabled) { background: var(--lilac); }
+.board button:disabled, .companion button:disabled { opacity: .5; cursor: default; }
+.boardBody, .canvas { height: 100%; width: 100%; }
+.canvas :global(.react-flow__node-default) { background: var(--canvas-card); color: var(--canvas-text); border: 3px solid var(--canvas-text); border-radius: 0; padding: 20px 16px; width: 220px; font: 16px/1.4 var(--font-atkinson), sans-serif; box-shadow: 5px 5px 0 var(--canvas-line); overflow-wrap: anywhere; }
+.canvas :global(.react-flow__node.selected) { background: var(--lilac); color: var(--ink); border-color: var(--ink); }
+.canvas :global(.react-flow__handle) { width: 10px; height: 10px; background: var(--canvas-line); border: 2px solid var(--canvas-card); }
+.canvas :global(.react-flow__controls) { left: auto; right: 20px; top: 18px; bottom: auto; margin: 0; }
+.canvas :global(.react-flow__controls-button) { min-height: 30px; padding: 5px; box-shadow: none; }
+.canvas :global(.react-flow__attribution) { right: auto; left: 10px; background: var(--canvas-bg); color: var(--canvas-text); }
+.asideCard { opacity: .55; }
+.tools { position: absolute; z-index: 9; top: 75px; left: 22px; width: 300px; max-height: calc(100% - 110px); overflow: auto; border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 16px; background: var(--paper); color: var(--ink); font-size: 14px; }
+.tools h2 { font: 700 20px/1 var(--font-pixelify), sans-serif; }
+.tools form { display: grid; gap: 8px; margin: 16px 0; }
+.tools details { margin-top: 18px; }
+.tools summary { cursor: pointer; font-weight: 700; }
+.cardList { display: grid; gap: 8px; margin-top: 12px; }
+.cardList button { width: 100%; text-align: left; overflow-wrap: anywhere; }
+.cardEditor { position: absolute; z-index: 7; left: 22px; bottom: 30px; width: 320px; max-width: calc(100% - 44px); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); background: var(--paper); color: var(--ink); padding: 12px; display: grid; gap: 8px; }
+.cardEditor textarea { max-height: 120px; }
+.cardEditor p { font-size: 12px; }
+.boardStatus { position: absolute; left: 26px; bottom: 4px; max-width: calc(100% - 200px); font-size: 11px; pointer-events: none; background: var(--canvas-bg); }
+.empty { position: absolute; left: 20%; right: 20%; top: 40%; text-align: center; pointer-events: none; }
+.companion { position: fixed; z-index: 30; right: 24px; bottom: 24px; color: var(--ink); }
+.companion[hidden] { display: none; }
+.companion[data-canvas="false"] .pipLauncher { display: none; }
+.companion .pipLauncher { display: flex; align-items: flex-end; gap: 12px; margin-left: auto; background: none; border: 0; box-shadow: none; padding: 0; }
+.companion .pipLauncher:hover { background: none; }
+.pipInvitation { background: var(--paper); border: 3px solid var(--ink); padding: 12px; max-width: 170px; margin-bottom: 4px; box-shadow: 4px 4px 0 var(--ink); text-align: left; }
+.companion[data-expanded="true"] .pipInvitation { display: none; }
+.pipPanel { width: 330px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 185px); overflow-y: auto; overscroll-behavior: contain; padding: 16px; border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); background: var(--paper); margin-top: 8px; }
+.pipPanel[hidden] { display: none; }
+.pipHeading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 14px; }
+.pipHeading h2 { font: 700 26px/1 var(--font-pixelify), sans-serif; }
+.pipHeading p { font-size: 12px; color: var(--muted); }
+.bubble { border-top: 2px dashed var(--lilac); padding-top: 12px; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.voiceControls { display: flex; gap: 8px; margin: 14px 0 10px; }
+.companion .primary { background: var(--mint); flex: 1; }
+.caption { font-size: 13px; line-height: 1.4; max-height: 90px; overflow: auto; margin-top: 10px; }
+.composer { border-top: 2px dashed var(--lilac); margin-top: 14px; padding-top: 12px; }
+.composer label { display: block; margin-bottom: 6px; }
+.composer textarea { resize: vertical; }
+.composer .actions { margin-top: 8px; justify-content: space-between; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.suggestion { border: 2px dashed var(--ink); background: var(--lilac); padding: 12px; margin-top: 16px; }
+.suggestion h3 { font: 700 14px/1 var(--font-pixelify), sans-serif; }
+.suggestion p { margin: 8px 0 12px; line-height: 1.4; }
+.message { font-size: 12px; line-height: 1.4; margin-top: 10px; }
+.speaking { animation: speak .6s ease-in-out infinite; }
+@keyframes speak { 50% { transform: translateY(-5px) rotate(-3deg); } }
+@media (prefers-reduced-motion: reduce) { .speaking { animation: none; } }
+@media (max-width: 760px) {
+ .canvasHeader { gap: 12px; padding: 10px 12px; }
+ .canvasHeader h1 { font-size: 20px; }
+ .headerActions { gap: 8px; }
+ .save { display: none; }
+ .boardToolbar { left: 12px; top: 12px; }
+ .boardToolbar button { padding: 7px 9px; min-height: 40px; }
+ .canvas :global(.react-flow__controls) { right: 12px; top: 65px; }
+ .cardEditor { left: 12px; bottom: 18px; width: min(280px, calc(100vw - 120px)); padding: 10px; }
+ .cardEditor textarea { height: 65px; }
+ .cardEditor button { font-size: 12px; padding: 6px; min-height: 34px; }
+ .tools { left: 12px; top: 65px; max-width: calc(100% - 24px); }
+ .boardStatus { display: none; }
+ .companion { right: 12px; bottom: 16px; }
+ .pipInvitation { display: none; }
+ .pipPanel { max-height: calc(100dvh - 190px); width: min(350px, calc(100vw - 24px)); }
+}
+@media (max-width: 400px) { .canvasHeader h1 { font-size: 18px; } .canvasHeader :global(.pixel-button) { padding: 7px; font-size: 12px; } }

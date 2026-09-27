@@ -1,6 +1,6 @@
 // Real Pip adapter: asks Gemini for one coaching turn.
 // Keep the function name and signature so the /api/pip/turn route does not need to change.
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import type { PipTurnRequest } from "../contracts";
 
@@ -105,7 +105,9 @@ function generate(ai: GoogleGenAI, model: string, request: PipTurnRequest) {
       systemInstruction: PIP_SYSTEM_INSTRUCTION,
       responseMimeType: "application/json",
       responseJsonSchema: modelOutputJsonSchema,
-      maxOutputTokens: 512,
+      // Gemini 3 counts reasoning in this budget too. Leave room for valid JSON.
+      maxOutputTokens: 2048,
+      ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
       httpOptions: { timeout: 15_000 },
     },
   });
@@ -154,6 +156,10 @@ export async function getPipReply(request: PipTurnRequest): Promise<unknown> {
   try {
     output = modelOutputSchema.parse(JSON.parse(response.text ?? ""));
   } catch {
+    console.warn("Pip: unusable structured reply", {
+      finishReason: response.candidates?.[0]?.finishReason,
+      responseCharacters: response.text?.length ?? 0,
+    });
     throw new InvalidPipModelOutputError();
   }
 
