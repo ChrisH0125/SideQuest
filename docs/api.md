@@ -83,4 +83,10 @@ With the app running (`npm run dev`), run `npm run smoke:api`. It sends the samp
 request, a large-but-valid request, and bad, empty, oversized, and inconsistent
 requests, then checks each status, error code, and that no error message leaks
 validator jargon. It makes 2 real Gemini calls when a key is configured. Without a
-key those two return `ai_unavailable`, which the script also accepts.
+key, use `npm run smoke:api -- --allow-ai-unavailable` to permit only
+`ai_unavailable` for those two requests. The default requires real, schema-valid
+replies matching the request ID, revision, and existing cards. Malformed replies
+and `invalid_ai_output` always fail, including in offline mode.
+
+Run `npm run test:api` for local regression checks of interrupted/oversized bodies
+and the smoke test's success and failure detection; no Gemini key is needed.

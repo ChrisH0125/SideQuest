@@ -11,6 +11,7 @@ Set these in the host's settings, never in a committed file.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Yes | The team's Gemini API key. Server-only. |
 | `GEMINI_TEXT_MODEL` | Yes | The Gemini model ID the AI teammate verified on the team's account. |
+| `GEMINI_TEXT_FALLBACK_MODEL` | No | Optional fallback for transient Gemini failures. |
 | `GEMINI_LIVE_MODEL` | No | Not used by the code yet. |
 
 Rules:
@@ -24,7 +25,8 @@ Rules:
 
 1. `npm run lint`, `npm run typecheck`, and `npm run build` all pass.
 2. Start the production build locally (`npm run build`, then `npm start`) and run
-   `npm run smoke:api`. Every check should pass.
+   `npm run smoke:api`. Every check should pass with real Gemini replies. For local
+   validation without a key only, use `npm run smoke:api -- --allow-ai-unavailable`.
 3. Confirm the deployed site's Pip replies are real (not `ai_unavailable`).
 
 ## Known limits of the rate limiter

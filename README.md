@@ -39,6 +39,7 @@ Put real values in `.env.local`. Never commit it.
 | `npm run typecheck` | Check data types without building |
 | `npm run build` | Production build; run before any demo |
 | `npm start` | Run the production build |
+| `npm run test:api` | Regression checks for request reading and smoke-test validation |
 | `npm run smoke:api` | Test `/api/pip/turn` with good and bad requests (app must be running) |
 
 ## Folder layout

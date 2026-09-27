@@ -8,10 +8,9 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
   const declaredSize = Number(request.headers.get("content-length"));
   if (declaredSize > maxBytes) return { ok: false, reason: "too_large" };
 
-  const text = await readTextUpTo(request, maxBytes);
-  if (text === null) return { ok: false, reason: "too_large" };
-
   try {
+    const text = await readTextUpTo(request, maxBytes);
+    if (text === null) return { ok: false, reason: "too_large" };
     return { ok: true, value: JSON.parse(text) };
   } catch {
     return { ok: false, reason: "not_json" };
@@ -25,15 +24,20 @@ async function readTextUpTo(request: Request, maxBytes: number): Promise<string 
   const chunks: Uint8Array[] = [];
   let total = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      return null;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        // Cleanup failure must not turn a known size violation into a 500.
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    reader.releaseLock();
   }
 
   const bytes = new Uint8Array(total);
