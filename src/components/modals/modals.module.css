@@ -1,0 +1,398 @@
+/* Modal shell + per-modal styles. Reads palette tokens from :root. */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.backdrop {
+  position: absolute; inset: 0;
+  background: rgba(45,27,61,0.65);
+  background-image: radial-gradient(circle at 4px 4px, rgba(0,0,0,0.15) 1.5px, transparent 1.5px);
+  background-size: 8px 8px;
+}
+:global(:root[data-theme="dark"]) .backdrop,
+:global(:root:not([data-theme="light"])) .backdrop {
+  background-color: rgba(11,4,23,0.75);
+}
+.window {
+  position: relative;
+  z-index: 1;
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  box-shadow: 10px 10px 0 var(--shadow-ink);
+  width: min(760px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+}
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 8px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  border-bottom: 4px solid var(--ink);
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.close {
+  background: var(--tomato);
+  border: 3px solid var(--paper);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: 14px;
+  width: 34px; height: 34px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  box-shadow: 3px 3px 0 var(--paper);
+  cursor: pointer;
+}
+.close:focus-visible { outline: 3px dashed var(--sun); outline-offset: 2px; }
+.body { padding: 20px; overflow: auto; flex: 1; min-height: 0; }
+.footer {
+  border-top: 4px solid var(--ink);
+  padding: 10px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--wall-1);
+  color: var(--ink);
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 6px 14px;
+  background: var(--mint);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow-ink);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn.secondary { background: var(--pinky); }
+.note {
+  padding: 10px 12px;
+  border: 3px dashed var(--ink);
+  background: repeating-linear-gradient(45deg, rgba(255,209,102,0.35) 0 6px, var(--paper) 6px 12px);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.note b {
+  font-family: var(--font-display);
+  color: var(--ink);
+  letter-spacing: 1px;
+}
+
+/* --- notebook modal --- */
+.nbToolbar {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.reqSummary { font-size: 12px; color: var(--muted); }
+.nbPage {
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  padding: 20px 24px 20px 60px;
+  background-image: repeating-linear-gradient(0deg, transparent 0 28px, rgba(45,27,61,0.12) 28px 29px);
+  position: relative;
+  min-height: 320px;
+}
+:global(:root[data-theme="dark"]) .nbPage,
+:global(:root:not([data-theme="light"])) .nbPage {
+  background-image: repeating-linear-gradient(0deg, transparent 0 28px, rgba(245,229,196,0.16) 28px 29px);
+}
+.nbPage::before {
+  content: '';
+  position: absolute;
+  left: 44px; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--tomato);
+}
+.nbTextarea {
+  width: 100%;
+  min-height: 320px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  resize: vertical;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 28px;
+}
+.nbTextarea:focus { outline: none; }
+.nbWordCount {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  background: var(--mint);
+  border: 3px solid var(--ink);
+  color: var(--ink);
+}
+.nbToast {
+  padding: 3px 10px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.nbToastVisible { opacity: 1; }
+
+/* --- board modal --- */
+.boardPreview {
+  background:
+    radial-gradient(circle at 4px 4px, rgba(0,0,0,0.10) 1.5px, transparent 1.5px),
+    #cba375;
+  background-size: 8px 8px, 100% 100%;
+  border: 6px solid #8a6740;
+  outline: 4px solid var(--ink);
+  min-height: 320px;
+  position: relative;
+  padding: 20px;
+}
+.bigCard {
+  position: absolute;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  padding: 12px 14px;
+  width: 200px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.bigCard::before {
+  content: '';
+  position: absolute; top: -8px; left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  width: 24px; height: 12px;
+  background: var(--pinky);
+  border: 2px solid var(--ink);
+}
+.bigCard.pending {
+  background: repeating-linear-gradient(45deg, rgba(195,177,255,0.5) 0 6px, var(--paper) 6px 12px);
+  border-style: dashed;
+}
+.bigCard.pending::before { background: var(--lilac); }
+.bcKind {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 1px 6px;
+  background: var(--mint);
+  border: 2px solid var(--ink);
+  margin-bottom: 6px;
+}
+.bigCard.pending .bcKind { background: var(--lilac); }
+.bc1 { top: 20px; left: 20px; transform: rotate(-2deg); }
+.bc2 { top: 30px; left: 260px; transform: rotate(2deg); }
+.bc3 { top: 160px; left: 130px; transform: rotate(-1deg); }
+.bcArrow {
+  position: absolute; top: 60px; left: 230px;
+  width: 40px; height: 5px; background: var(--ink);
+}
+.bcArrow::after {
+  content: ''; position: absolute; right: -10px; top: -6px;
+  width: 0; height: 0;
+  border-left: 12px solid var(--ink);
+  border-top: 8px solid transparent; border-bottom: 8px solid transparent;
+}
+
+/* --- mic modal --- */
+.micConsole { display: flex; gap: 20px; align-items: stretch; flex-wrap: wrap; }
+.micLeft {
+  flex: 0 0 200px;
+  background: var(--sky);
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: var(--ink);
+}
+.bigRec {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: var(--tomato);
+  border: 5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: 12px; letter-spacing: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.micInput {
+  width: 100%; padding: 8px 10px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+}
+.micRight {
+  flex: 1; min-width: 260px;
+  border: 3px dashed var(--ink);
+  background: var(--paper);
+  padding: 12px; max-height: 300px; overflow: auto;
+}
+.chatTurn {
+  padding: 8px 10px; border: 3px solid var(--ink);
+  margin-bottom: 8px; font-size: 13px;
+  color: var(--ink);
+}
+.chatTurn.pip { background: var(--pinky); }
+.chatTurn.user { background: var(--paper); }
+.chatWho {
+  font-family: var(--font-display);
+  font-size: 10px; letter-spacing: 2px;
+  margin-bottom: 4px; color: var(--tomato);
+}
+.chatTurn.user .chatWho { color: var(--muted); }
+
+/* --- pip modal --- */
+.pipCustomize { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.pipFrame {
+  flex: 0 0 200px;
+  background: var(--sun);
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pipOptions { flex: 1; min-width: 220px; }
+.pipOptionRow { margin-bottom: 12px; }
+.pipOptionLabel {
+  font-family: var(--font-display);
+  font-size: 12px; letter-spacing: 1px;
+  color: var(--muted); margin-bottom: 6px;
+}
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch {
+  width: 36px; height: 36px;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow-ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 10px; letter-spacing: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.swatch.chosen { outline: 3px dashed var(--tomato); outline-offset: 3px; }
+
+/* --- shop modal --- */
+.shopGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+.shopTile {
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  align-items: center; text-align: center;
+  color: var(--ink);
+}
+.shopThumb { height: 60px; display: inline-flex; align-items: end; justify-content: center; }
+.shopThumb .item {
+  border: 3px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--shadow-ink);
+}
+.shopName { font-family: var(--font-display); font-size: 13px; letter-spacing: 1px; }
+.shopCost { font-size: 12px; color: var(--muted); }
+.shopBuy {
+  padding: 4px 10px;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow-ink);
+  background: var(--mint);
+  font-family: var(--font-display);
+  font-size: 12px; letter-spacing: 1px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.shopBuy[disabled] {
+  background: rgba(45,27,61,0.15);
+  color: var(--muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* --- clipboard modal --- */
+.assignBlock {
+  padding: 14px 16px; background: var(--paper);
+  border: 4px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow-ink);
+  margin-bottom: 12px;
+  color: var(--ink);
+}
+.assignBlock h3 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 14px; letter-spacing: 1px; color: var(--muted);
+}
+.assignBlock p { margin: 0; font-size: 14px; }
+.reqRow {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 0; border-bottom: 2px dashed var(--ink);
+  font-size: 14px;
+}
+.reqRow:last-child { border-bottom: 0; }
+.reqBox {
+  flex-shrink: 0; width: 18px; height: 18px;
+  border: 3px solid var(--ink);
+  background: var(--paper); margin-top: 1px;
+}
+.reqPendingRow {
+  margin-top: 12px; padding: 10px 12px;
+  background: repeating-linear-gradient(45deg, rgba(195,177,255,0.5) 0 6px, var(--paper) 6px 12px);
+  border: 3px dashed var(--ink);
+  font-size: 13px;
+}
+.reqPendingLabel {
+  font-family: var(--font-display);
+  font-size: 11px; letter-spacing: 2px;
+  color: var(--muted); margin-bottom: 6px;
+}
+
+/* Inline requirement chips (used at the top of the notebook modal so the
+   assignment is always visible while writing). */
+.reqInline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px dashed var(--ink);
+}
+.reqInlineItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.reqBoxSmall {
+  flex-shrink: 0;
+  width: 12px; height: 12px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+}

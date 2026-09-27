@@ -21,7 +21,9 @@
   --wall-2: #e8c184;
   --floor-1: #c19067;
   --floor-2: #a26f47;
-  --muted: #6a577c;
+  /* Muted must still be readable on cream (paper). #4a3b5c gives ~7:1
+     on #fff6dc — safe for secondary text down to WCAG AA large. */
+  --muted: #4a3b5c;
 
   /* Theme-aware slots — flipped in dark mode below */
   --background: var(--wall-1);
