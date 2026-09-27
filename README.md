@@ -3,6 +3,8 @@
 A cozy pixel workspace for turning an overwhelming assignment into your own
 writing. The Figma Make room from PR #10 is the home screen. See `AGENTS.md`.
 
+Docs: [API](docs/api.md) · [Deployment](docs/deployment.md)
+
 ## Setup
 
 Node.js 20.9 or newer (24 LTS recommended), npm.
@@ -64,6 +66,8 @@ accessories are outside this revision.
 | `npm run typecheck` | Generate Next.js types and check TypeScript |
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
+| `npm run test:api` | Request reader and smoke validation regression checks |
+| `npm run smoke:api` | Check the running API with real replies; append `-- --allow-ai-unavailable` for offline checks |
 | `node scripts/check-workspace.cjs` | Undo, rewards, limits, stale replies and storage regression checks |
 | `npm run lint` | ESLint (skipped for this revision at Chris's request) |
 

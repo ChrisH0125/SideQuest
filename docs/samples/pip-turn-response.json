@@ -1,0 +1,30 @@
+{
+  "requestId": "req-demo-1",
+  "basedOnRevision": 3,
+  "replyText": "This could be one of your two examples. Did they know each other before?",
+  "highlightedCardIds": [
+    "card-grandma",
+    "card-gardens"
+  ],
+  "suggestedRequirements": [],
+  "suggestedCards": [
+    {
+      "suggestionId": "req-demo-1-card-0",
+      "text": "How they met through the garden",
+      "kind": "idea"
+    }
+  ],
+  "suggestedNextStep": {
+    "suggestionId": "req-demo-1-next",
+    "text": "Write two sentences about how they met"
+  },
+  "proposedActions": [
+    {
+      "type": "highlight",
+      "cardIds": [
+        "card-grandma",
+        "card-gardens"
+      ]
+    }
+  ]
+}
