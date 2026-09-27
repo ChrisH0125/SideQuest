@@ -111,6 +111,19 @@ function generate(ai: GoogleGenAI, model: string, request: PipTurnRequest) {
   });
 }
 
+function getHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null || !("status" in error)) {
+    return undefined;
+  }
+
+  return typeof error.status === "number" ? error.status : undefined;
+}
+
+function shouldTryFallback(error: unknown): boolean {
+  const status = getHttpStatus(error);
+  return status === 408 || status === 429 || (status !== undefined && status >= 500);
+}
+
 // Returns unknown on purpose: the route performs a final request-aware validation.
 export async function getPipReply(request: PipTurnRequest): Promise<unknown> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -126,13 +139,14 @@ export async function getPipReply(request: PipTurnRequest): Promise<unknown> {
   try {
     response = await generate(ai, model, request);
   } catch (error) {
-    if (fallbackModel === model) {
+    if (fallbackModel === model || !shouldTryFallback(error)) {
       throw error;
     }
-    console.warn(
-      `Pip: ${model} failed, trying ${fallbackModel}:`,
-      error instanceof Error ? error.message : error,
-    );
+    console.warn("Pip: primary Gemini model is temporarily unavailable; trying fallback.", {
+      primaryModel: model,
+      fallbackModel,
+      status: getHttpStatus(error),
+    });
     response = await generate(ai, fallbackModel, request);
   }
 
